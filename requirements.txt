@@ -1,0 +1,5 @@
+netaddr
+bs4
+edgar
+lxml
+requests
