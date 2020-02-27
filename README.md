@@ -6,7 +6,9 @@ Find netblocks owned by a company
 
 ## Quick Run
 ```
-python3 NetblockTool.py -v CompanyName
+git clone https://github.com/NetSPI/NetblockTool.git
+cd NetblockTool && pip3 install -r requirements.txt
+python3 NetblockTool.py -v Company
 ```
 
 ## Usage
