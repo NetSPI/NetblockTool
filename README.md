@@ -4,6 +4,11 @@ By Alex Poorman
 ## Purpose
 Find netblocks owned by a company
 
+## Quick Run
+```
+python3 NetblockTool.py -v CompanyName
+```
+
 ## Usage
 ```
 root@kali:~# python3 NetblockTool.py 
@@ -59,25 +64,7 @@ Examples:
     python NetblockTool.py -so -wv Facebook -o Results
     python NetblockTool.py -gavl companies.txt
 
-
 ```
-## YouTube Demo
-[![Watch the demo](https://i.imgur.com/O37rqG7.png)](https://youtu.be/-UNu8Jp3zvI)
-
-## Recent Changes
-* Added deduplication feature
-* Added confidence score explanation to output
-* Added geolocation functionality
-* Added confidence score threshold option
-* Added address to output (optional)
-* Added address grepping to output (optional)
-* Added ARIN URL to output
-* Added company subsidiary retrieval feature
-* Added support to retrieve netblocks for retrieved subsidiaries
-* Added IPv6 support
-* Added quiet mode
-* Added option to use different name for subsidiary query than netblock query
-* Output gathered PoC and address information into a separate file
 
 ## General Information
 * This script uses both the ARIN API with wildcard queries and ARIN queries through their website search bar, which provides more results than just the wildcard queries alone.
@@ -93,4 +80,6 @@ Run `pip3 install <module name>` on the following modules:
 
 Alternatively, you can run `pip3 install -r requirements.txt`
 
-If `pip3` is not in your path, try `C:\Python3\Scripts\pip3.exe install <module name>` or `apt-get install python3-pip`
+
+## Demo
+![gif](https://i.imgur.com/EQB34j6.gif)
