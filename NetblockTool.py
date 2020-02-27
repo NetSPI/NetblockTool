@@ -110,7 +110,7 @@ STATES = ['afghanistan', 'ak', 'al', 'alabama', 'alaska', 'albania', 'alberta',
           'uzbekistan', 'va', 'vanuatu', 'vatican city', 'venezuela', 'vermont',
           'vietnam', 'virgin islands', 'virginia', 'vt', 'wa', 'washington',
           'west virginia', 'wi', 'wisconsin', 'wv', 'wy', 'wyoming', 'yemen',
-          'zambia', 'zimbabwe']
+          'zambia', 'zimbabwe','people\'s republic of china']
 EXT = ['llc', 'corp', 'corporation', 'inc', 'ltd', 'limited', '-cust', 'lp',
        'jv', 'pc', 'llp', 'lllp', 'pllc', 'dba', 'cust', 'co', 'company',
        'gmbh', 'ulc', 'sas', 'kk', 'bv', 'sl', 'sa de cv', 's de rl de cv',
@@ -620,7 +620,7 @@ def process_duplicate_ranges(netblock_list, verbose, quiet):
 
     # Process data and return
     if not quiet:
-        print('  [*] Removed '+str(removed)+' ranges')
+        print('  [*] Marked '+str(removed)+' ranges as duplicate')
     for sub_list in no_ip_data:
         final_return_list.append(sub_list)
     final_return_list = sorted(final_return_list, key=operator.itemgetter(4), reverse=True)
