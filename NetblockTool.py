@@ -171,7 +171,7 @@ def main(passed_target, passed_company_name, passed_query, passed_verbose,
         for item in arin_objects:
             arin_object_count += 1
             if verbose:
-                print('  ['+str(arin_object_count)+'/'+str(len(arin_objects))+']', item)
+                print('  ['+str(arin_object_count)+'/'+str(len(arin_objects))+']', item, end='\r')
             if '/rest/net' in item and not item.endswith('/rdns'):
                 if not item.endswith('/resources'):
                     if not item.endswith('/pocs'):
@@ -560,10 +560,10 @@ def process_duplicate_ranges(netblock_list, verbose, quiet):
         if verbose:
             if range_status % 50 == 0:
                 if not quiet:
-                    print('  [*] Status: '+str(range_status)+'/'+str(len(ranges)+len(ranges6)))
+                    print('  [*] Status: '+str(range_status)+'/'+str(len(ranges)+len(ranges6)), end='\r')
             elif (range_status == len(ranges)+len(ranges6) and len(ranges6) == 0):
                 if not quiet:
-                    print('  [*] Status: '+str(range_status)+'/'+str(len(ranges)+len(ranges6)))
+                    print('  [*] Status: '+str(range_status)+'/'+str(len(ranges)+len(ranges6)), end='\r')
         for network2 in ranges:
             if network1 != network2:
                 if netaddr.IPNetwork(network1) in netaddr.IPNetwork(network2):
@@ -574,10 +574,10 @@ def process_duplicate_ranges(netblock_list, verbose, quiet):
         if verbose:
             if range_status % 50 == 0:
                 if quiet == False:
-                    print('  [*] Status: '+str(range_status)+'/'+str(len(ranges)+len(ranges6)))
+                    print('  [*] Status: '+str(range_status)+'/'+str(len(ranges)+len(ranges6)), end='\r')
             elif range_status == len(ranges)+len(ranges6):
                 if not quiet:
-                    print('  [*] Status: '+str(range_status)+'/'+str(len(ranges)+len(ranges6)))
+                    print('  [*] Status: '+str(range_status)+'/'+str(len(ranges)+len(ranges6)), end='\r')
         for network2 in ranges6:
             if network1 != network2:
                 if netaddr.IPNetwork(network1) in netaddr.IPNetwork(network2):
