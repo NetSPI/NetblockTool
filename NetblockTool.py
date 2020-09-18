@@ -19,26 +19,22 @@
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
-try:
-    import sys
-    import re
-    import json
-    import csv
-    import operator
-    import argparse
-    import urllib
-    import socket
-    import netaddr
-    import edgar
-    import requests
-    from requests.packages.urllib3.exceptions import InsecureRequestWarning
-    from lxml import html
-    from bs4 import BeautifulSoup
-except ImportError as e:
-    print(sys.argv[0], ':', e)
-    print(sys.argv[0], (': error: The required module isn\'t installed. Please '
-                        'run `pip3` and install the module.'))
-    sys.exit()
+import sys
+import re
+import json
+import csv
+import operator
+import argparse
+import urllib
+import socket
+import netaddr
+import edgar
+import requests
+import time
+import random
+from requests.packages.urllib3.exceptions import InsecureRequestWarning
+from lxml import html
+from bs4 import BeautifulSoup
 
 
 # Configure requests to only support high-level ciphers
@@ -123,7 +119,7 @@ EXT = ['llc', 'corp', 'corporation', 'inc', 'ltd', 'limited', '-cust', 'lp',
 
 def main(passed_target, passed_company_name, passed_query, passed_verbose,
          passed_threshold, passed_geo, passed_address, passed_address_grep,
-         passed_version, passed_quiet, passed_poc):
+         passed_version, passed_quiet, passed_poc, passed_no_google):
     # Process arguments
     target = passed_target
     query = passed_query
@@ -142,11 +138,12 @@ def main(passed_target, passed_company_name, passed_query, passed_verbose,
     address_grep = passed_address_grep
     ip_version = passed_version
     query_poc = passed_poc
+    no_google = passed_no_google
     return_list = []
 
     # Function variables
     csv_headers = ['Network', 'Name', 'ID', 'Type', 'Confidence',
-                   'Score Rationale', 'ARIN Resource URL']
+                   'Score Rationale', 'Resource URL']
     arin_org_addresses = []
     arin_net = []
     arin_asn = []
@@ -157,7 +154,23 @@ def main(passed_target, passed_company_name, passed_query, passed_verbose,
     address_freq = []
     retrieved_pocs = []
     arin_pocs_unique = []
+    google_networks = []
     arin_object_count = 0
+
+    # Get networks from Google
+    if not no_google:
+        if not quiet:
+            print('[*] Retrieving networks using Google Dorking for', target,'(usually < 30 pages)')
+        google_networks = get_google_networks(target, verbose, quiet)
+        if google_networks:
+            for net in google_networks:
+                arin_net.append(net)
+        elif google_networks == False:
+            if not quiet:
+                print('  [!] Google CAPTCHA detected. Unable to retrieve results from Google.')
+        else:
+            if not quiet:
+                print('[!] No networks found using Google for '+target)
 
     # Get ARIN objects
     if not quiet:
@@ -171,7 +184,7 @@ def main(passed_target, passed_company_name, passed_query, passed_verbose,
         for item in arin_objects:
             arin_object_count += 1
             if verbose:
-                print('  ['+str(arin_object_count)+'/'+str(len(arin_objects))+']', item, end='\r')
+                print('  ['+str(arin_object_count)+'/'+str(len(arin_objects))+']', item, ' '*20, end='\r')
             if '/rest/net' in item and not item.endswith('/rdns'):
                 if not item.endswith('/resources'):
                     if not item.endswith('/pocs'):
@@ -197,6 +210,7 @@ def main(passed_target, passed_company_name, passed_query, passed_verbose,
                         arin_pocs.append(get_poc_info(item))
                         retrieved_pocs.append(item)
 
+    if (arin_objects) or (google_networks):
         # If PoC info was requested, deduplicate, sort, and write to file
         if query_poc:
             process_poc_output(arin_pocs, target, verbose, quiet)
@@ -277,9 +291,8 @@ def process_netblock_confidence(process_list, company_name, query, address_freq)
             score += 50
             reason = 'Network'
         # Company name
-        check_string = process_company_name(''.join(sub_list[1]).lower(),
-                                         company_name)
-        if company_name.lower() not in str(sub_list[1]).lower():
+        check_string = process_company_name(''.join(sub_list[1]).lower(), company_name)
+        if company_name.lower() not in check_string.lower():
             score -= 50
             reason += ', company name not in name parameter'
         for name_check in company_strings:
@@ -293,22 +306,23 @@ def process_netblock_confidence(process_list, company_name, query, address_freq)
         if not found:
             for name_check in company_strings:
                 try:
-                    if name_check.lower() == ''.join(check_string).lower().split('-')[0]:
+                    if name_check.lower() == check_string:
                         score += 10
                         reason += ', company name in name parameter'
                         found = True
                 except IndexError:
                     None
         # Remove data after '-' and perform check again
+        hyphen_check_string = ''.join(sub_list[1]).lower().replace(',','').replace('.','')
         if not found:
-            for i in check_string:
+            for i in hyphen_check_string:
                 if i.isdigit():
-                    check_string = check_string.split(i)[0]
-                    if len(check_string) > 0:
-                        if check_string[-1] == '-':
-                            check_string = check_string[:-1]
+                    hyphen_check_string = hyphen_check_string.split(i)[0]
+                    if len(hyphen_check_string) > 0:
+                        if hyphen_check_string[-1] == '-':
+                            hyphen_check_string = hyphen_check_string[:-1]
             for name_check in company_strings:
-                if name_check.lower() == check_string.lower():
+                if name_check.lower() == hyphen_check_string.lower():
                     score += 10
                     reason += ', company name is name parameter'
                     found = True
@@ -560,10 +574,10 @@ def process_duplicate_ranges(netblock_list, verbose, quiet):
         if verbose:
             if range_status % 50 == 0:
                 if not quiet:
-                    print('  [*] Status: '+str(range_status)+'/'+str(len(ranges)+len(ranges6)), end='\r')
+                    print('  [*] Status: '+str(range_status)+'/'+str(len(ranges)+len(ranges6)), ' '*20, end='\r')
             elif (range_status == len(ranges)+len(ranges6) and len(ranges6) == 0):
                 if not quiet:
-                    print('  [*] Status: '+str(range_status)+'/'+str(len(ranges)+len(ranges6)), end='\r')
+                    print('  [*] Status: '+str(range_status)+'/'+str(len(ranges)+len(ranges6)), ' '*20, end='\r')
         for network2 in ranges:
             if network1 != network2:
                 if netaddr.IPNetwork(network1) in netaddr.IPNetwork(network2):
@@ -574,10 +588,10 @@ def process_duplicate_ranges(netblock_list, verbose, quiet):
         if verbose:
             if range_status % 50 == 0:
                 if quiet == False:
-                    print('  [*] Status: '+str(range_status)+'/'+str(len(ranges)+len(ranges6)), end='\r')
+                    print('  [*] Status: '+str(range_status)+'/'+str(len(ranges)+len(ranges6)), ' '*20, end='\r')
             elif range_status == len(ranges)+len(ranges6):
                 if not quiet:
-                    print('  [*] Status: '+str(range_status)+'/'+str(len(ranges)+len(ranges6)), end='\r')
+                    print('  [*] Status: '+str(range_status)+'/'+str(len(ranges)+len(ranges6)), ' '*20, end='\r')
         for network2 in ranges6:
             if network1 != network2:
                 if netaddr.IPNetwork(network1) in netaddr.IPNetwork(network2):
@@ -1638,6 +1652,162 @@ def get_subsidiaries(company_name, verbose, alt_method, quiet):
     return sorted(return_list)
 
 
+def get_google_networks(target, verbose, quiet):
+    """Retrieves networks from Google.
+
+    Args:
+        target: A string containing the target company name.
+        verbose: A boolean that indicates whether verbose status messages
+            should be printed.
+        quiet: A boolean that indicates that all status messages should be
+            disabled.
+
+    Returns:
+        A list of lists containing network information. The sublist contains the
+        identified netblock, the company name, the identifier, a blank string
+        representing the address (to keep the data formatting consistent between
+        ARIN object lists), the type (network), and the resource URL. An example
+        is below:
+
+            [
+                ['107.167.160.0/19', 'GOOGLE-CLOUD', 'NET-107-167-160-0-1', '',
+                'network', 'http://whois.arin.net/rest/net/NET-107-167-160-0-1']
+            ]
+    """
+    # Local variables
+    search_term = 'site:ipinfo.io "'+target+'" "netblock details"'
+    headers =   {   'Host': 'www.google.com',
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:68.0) Gecko/20100101 Firefox/68.0',
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                    'Accept-Language': 'en-US,en;q=0.5',
+                    'Accept-Encoding': 'gzip, deflate',
+                    'Connection': 'close',
+                    'Upgrade-Insecure-Requests': '1'
+                }
+    results = []
+    start_num = 0
+    runs = 0
+    continue_scrape = True
+
+    # Get Google results
+    while continue_scrape == True:
+        # Local variables
+        recent = []
+        runs += 1
+
+        # Print status
+        if verbose:
+            print('  [*] Status: Parsing page', runs, ' '*20, end='\r')
+
+        # Make request to Google
+        try:
+            req = requests.get('https://www.google.com/search?hl=en&q='+process_url_encode(search_term)+'&start='+str(start_num), headers=headers, timeout=5)
+            start_num += 10
+
+            # Detect CAPTCHA, if present, quit method
+            if 'Our systems have detected unusual traffic from your computer network.' in req.text:
+                return False
+        except requests.exceptions.RequestException as e:
+            if not quiet:
+                print('\n  [!] ERROR: Requests error:',e )
+            continue_scrape = False
+
+        # Get network and IPinfo link from Google result page
+        if continue_scrape:
+            soup = BeautifulSoup(req.text, 'html.parser')
+            for tag in soup.find_all('a', href=True):
+                if 'ipinfo.io/' in tag['href']:
+                    recent.append(tag)
+                    try:
+                        # Parse network information from search result
+                        network = str(netaddr.IPNetwork(tag.text.split(' ')[0]))
+                        url = tag['href']
+                        handle = url.split('ipinfo.io/')[1]
+                        result_title = tag.text.split('Netblock Details -')[1]
+                        # Try to get an identifiable name for the network
+                        name = ''
+                        if target.lower() in result_title.lower():
+                            name = target
+                        else:
+                            nethandle = get_nethandle(url)
+                            if nethandle:
+                                arin_nets = get_net_info('https://whois.arin.net/rest/net/'+nethandle)
+                                for sublist in arin_nets:
+                                    results.append(sublist)
+                            else:
+                                name = None
+                        # If a name was identified, add to results
+                        if name:
+                            results.append([network, target, handle, '', 'network', url])
+                    except netaddr.AddrFormatError:
+                        None
+
+        # Determine if scraping needs to stop
+        if len(recent) == 0:
+            continue_scrape = False
+        try:
+            soup_b = BeautifulSoup(req.text, 'html.parser')
+            for tag in soup_b.find_all('b', text=True):
+                if search_term == tag.text:
+                    continue_scrape = False
+                    if verbose:
+                        print('  [*] Status: Scrape complete')
+            if 'In order to show you the most relevant results, we have omitted some entries very similar to' in req.text:
+                continue_scrape = False
+                if verbose:
+                    print('  [*] Status: Scrape complete')
+        except NameError:
+            None
+
+        # Sleep if more results still need to be scraped
+        if continue_scrape:
+            num = random.uniform(1,3)
+            if verbose:
+                print('  [*] Status: Sleeping for', format(num, '.1f'), 'seconds', ' '*20, end='\r')
+            time.sleep(num)
+
+    # Return results list
+    return results
+
+
+def get_nethandle(url):
+    """Retrieves an ARIN nethandle from an IPinfo network webpage.
+
+    Args:
+        url: The URL for an IPinfo network webpage.
+
+    Returns:
+        A string containing the ARIN nethandle. If no nethandle is found, None
+        is returned. An example is below:
+
+            NET-107-167-160-0-1
+    """
+    # Local variables
+    result = None
+    headers =   {   'Host': 'ipinfo.io',
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:68.0) Gecko/20100101 Firefox/68.0',
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                    'Accept-Language': 'en-US,en;q=0.5',
+                    'Accept-Encoding': 'gzip, deflate',
+                    'Connection': 'close',
+                    'Upgrade-Insecure-Requests': '1'
+                }
+
+    # Request nethandle and process
+    handle_req = requests.get(url, headers=headers)
+    soup_pre = BeautifulSoup(handle_req.text, 'html.parser')
+    for tag in soup_pre.find_all('pre', text=True):
+        if 'NetHandle' in tag.text:
+            for x in range(0,str(tag.text).count('\n')+1):
+                line = str(tag.text).split('\n')[x]
+                if 'NetHandle' in line:
+                    handle = line.split('NetHandle:')[1].lstrip()
+                    result = handle
+
+    # Return result
+    return result
+
+
 def get_statistics(netblock_list, subsid_mode):
     """Prints statistics about final results.
 
@@ -1699,6 +1869,7 @@ Optional arguments:
 
     Data Retrieval & Processing:
     -n        Don't perform thorough wildcard queries (query = target)
+    -ng       Don't perform Google Dorking queries
     -w        Perform more thorough complete wildcard queries (query = *target*). Note
                   that this option may return significantly more false positives.
     -c        Company name if different than target (may affect accuracy of confidence
@@ -1753,6 +1924,7 @@ if __name__ == '__main__':
     parser.add_argument('-6', '--ipv6', help='Only return IPv6 netblocks', action='store_true')
     parser.add_argument('-v', '--verbose', help='Verbose mode', action='store_true')
     parser.add_argument('-q', '--quiet', help='Quiet mode', action='store_true')
+    parser.add_argument('-ng', '--no-google', help='Don\'t perform Google Dorking queries', action='store_true')
     args = parser.parse_args()
     arg_target = str(args.target)
     arg_company_name = args.company_name
@@ -1774,6 +1946,7 @@ if __name__ == '__main__':
     arg_ipv4 = args.ipv4
     arg_ipv6 = args.ipv6
     arg_version = None
+    arg_no_google = args.no_google
 
     # Argument validation
     ## Check to see if both 'no wildcard' and 'wildcard' are set
@@ -1829,7 +2002,10 @@ if __name__ == '__main__':
     if not arg_output:
         arg_output = process_output_name(arg_target)+'.csv'
     else:
-        arg_output = process_output_name(arg_output)+'.csv'
+        if not arg_output.endswith('.csv'):
+            arg_output = process_output_name(arg_output)+'.csv'
+        else:
+            arg_output = process_output_name(arg_output)
 
     # Print banner
     if not arg_quiet:
@@ -1847,10 +2023,10 @@ if __name__ == '__main__':
             if arg_no_wildcard == True:
                 query = arg_target
             elif arg_wildcard == True:
-                query = '*'+arg_target+'*'
+                query = '*'+arg_target.replace(' ','*').replace('-','*')+'*'.replace('**','*')
             else:
                 query = arg_target+'*'
-            results = main(arg_target, arg_company_name, query, arg_verbose, arg_threshold, arg_geo, arg_address, arg_address_grep, arg_version, arg_quiet, arg_poc)
+            results = main(arg_target, arg_company_name, query, arg_verbose, arg_threshold, arg_geo, arg_address, arg_address_grep, arg_version, arg_quiet, arg_poc, arg_no_google)
             if results:
                 netblocks = results[0]
                 csv_headers = results[1]
@@ -1878,12 +2054,12 @@ if __name__ == '__main__':
                 if arg_no_wildcard:
                     query = company
                 elif arg_wildcard:
-                    query = '*'+company+'*'
+                    query = '*'+company.replace(' ','*').replace('-','*')+'*'.replace('**','*')
                 else:
                     query = company+'*'
                 if not arg_quiet:
                     print('\n[*] OVERALL STATUS: '+str(company_status)+'/'+str(len(companies))+'\n')
-                results = main(company, None, query, arg_verbose, arg_threshold, arg_geo, arg_address, arg_address_grep, arg_version, arg_quiet, arg_poc)
+                results = main(company, None, query, arg_verbose, arg_threshold, arg_geo, arg_address, arg_address_grep, arg_version, arg_quiet, arg_poc, arg_no_google)
                 if results:
                     netblocks = results[0]
                     csv_headers = results[1]
@@ -1917,12 +2093,12 @@ if __name__ == '__main__':
                 if arg_no_wildcard:
                     query = company
                 elif arg_wildcard:
-                    query = '*'+company+'*'
+                    query = '*'+company.replace(' ','*').replace('-','*')+'*'.replace('**','*')
                 else:
                     query = company+'*'
                 if not arg_quiet:
                     print('\n\n[*] OVERALL STATUS: '+str(company_status)+'/'+str(len(companies))+'\n\n')
-                results = main(company, None, query, arg_verbose, arg_threshold, arg_geo, arg_address, arg_address_grep, arg_version, arg_quiet, arg_poc)
+                results = main(company, None, query, arg_verbose, arg_threshold, arg_geo, arg_address, arg_address_grep, arg_version, arg_quiet, arg_poc, arg_no_google)
                 if results:
                     netblocks = results[0]
                     csv_headers = results[1]
@@ -1975,13 +2151,13 @@ if __name__ == '__main__':
                     if arg_no_wildcard:
                         query = company
                     elif arg_wildcard:
-                        query = '*'+company+'*'
+                        query = '*'+company.replace(' ','*').replace('-','*')+'*'.replace('**','*')
                     else:
                         query = company+'*'
                     company_status += 1
                     if not arg_quiet:
                         print('\n\n[*] COMPANY STATUS: '+str(company_status)+'/'+str(len(companies))+'\n\n')
-                    results = main(company, None, query, arg_verbose, arg_threshold, arg_geo, arg_address, arg_address_grep, arg_version, arg_quiet, arg_poc)
+                    results = main(company, None, query, arg_verbose, arg_threshold, arg_geo, arg_address, arg_address_grep, arg_version, arg_quiet, arg_poc, arg_no_google)
                     if results:
                         netblocks = results[0]
                         csv_headers = results[1]
