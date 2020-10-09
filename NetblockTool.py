@@ -559,9 +559,11 @@ def process_duplicate_ranges(netblock_list, verbose, quiet):
         try:
             netaddr.IPNetwork(sub_list[0])
             if netaddr.IPAddress(sub_list[0].split('/')[0]).version == 4:
-                ranges.append(sub_list[0])
+                if sub_list[4] != 0:
+                    ranges.append(sub_list[0])
             elif netaddr.IPAddress(sub_list[0].split('/')[0]).version == 6:
-                ranges6.append(sub_list[0])
+                if sub_list[4] != 0:
+                    ranges6.append(sub_list[0])
             else:
                 no_ip_data.append(sub_list)
         except netaddr.AddrFormatError:
