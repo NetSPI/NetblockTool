@@ -1743,6 +1743,8 @@ def get_google_networks(target, verbose, quiet):
                             results.append([network, target, handle, '', 'network', url])
                     except netaddr.AddrFormatError:
                         None
+                    except IndexError:
+                        None
 
         # Determine if scraping needs to stop
         if len(recent) == 0:
