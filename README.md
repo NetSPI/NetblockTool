@@ -1,8 +1,27 @@
 # NetblockTool
-By Alex Poorman
-
-## Purpose
 Find netblocks owned by a company
+
+[![licence badge]][licence] 
+[![stars badge]][stars] 
+[![forks badge]][forks] 
+[![issues badge]][issues]
+
+[licence badge]:https://img.shields.io/badge/license-New%20BSD-blue.svg
+[stars badge]:https://img.shields.io/github/stars/NetSPI/NetblockTool.svg
+[forks badge]:https://img.shields.io/github/forks/NetSPI/NetblockTool.svg
+[issues badge]:https://img.shields.io/github/issues/NetSPI/NetblockTool.svg
+
+[licence]:https://github.com/NetSPI/NetblockTool/blob/master/LICENSE
+[stars]:https://github.com/NetSPI/NetblockTool/stargazers
+[forks]:https://github.com/NetSPI/NetblockTool/network
+[issues]:https://github.com/NetSPI/NetblockTool/issues
+
+
+## Overview
+* Use NetblockTool to easily dump a unique list of IP addresses belonging to a company and its subsidiaries.
+* All data gathering is passive. No traffic is ever sent to the target company.
+* Sources include ARIN API, ARIN GUI search functionality, and Google dorking. Company subsidiaries are retrieved from SEC's public database.
+
 
 ## Quick Run
 ```
@@ -11,33 +30,15 @@ cd NetblockTool && pip3 install -r requirements.txt
 python3 NetblockTool.py -v Company
 ```
 
-## FAQ
-### Why?
-Finding netblocks that a company owns is a traditionally very manual process. Tools certainly exist that help with this process but they often simply use the ARIN API, which provides useful information but is ineffective at returning a list of netblocks for a company.
 
-NetblockTool automates the netblock discovery process and uses various sources and techniques to find netblocks, which include the ARIN API, ARIN GUI search functionality, and Google dorking. The netblocks are then processed and assigned a confidence score that they belong to the intended company.
+## Output
+Results are written to a CSV called *Company.csv* where *Company* is the provided company's name. The truncated output for Google is shown below.
 
-### What is the recommended usage?
-Single company:
+![NetblockOutput](https://blog.netspi.com/wp-content/uploads/2020/10/netblock_results.png) 
 
-  * `python3 NetblockTool.py -v Company`
-  
-Single company & only IPv4 addresses:
 
-  * `python3 NetblockTool.py -v -4 Company`
-  
-Single company with wildcard queries:
-
-  * `python3 NetblockTool.py -v -w Company`
-
-Multiple companies:
-
-  * `python3 NetblockTool.py -v -l company_list.txt`
-
-### What data does this need?
-This script only needs the target company name. It is useful, however, to try both normal and wildcard queries to see if additional results are provided with the wildcard query.
-
-### How does this script work?
+## How does this script work?
+In depth information on the tool and how it works can be found [here](https://blog.netspi.com/netblocktool/).
 * A target company is provided
 * Google dorking is used to find netblocks
 * Traffic is sent that simulates a user searching ARIN's database for the company name
@@ -46,15 +47,32 @@ This script only needs the target company name. It is useful, however, to try bo
 * Each netblock is given a confidence score
 * Netblocks are sorted by confidence score and written to a CSV
 
-### This script isn't working
-Ensure the following:
-* Are all of the dependencies listed in `requirements.txt` installed?
-* Is the version of the installed `edgar` dependency 1.0.0?
-* Is the script printing out `Google CAPTCHA detected`? You may need to change your public IP or wait ~60 minutes to retrieve Google dorking results. 
 
-## Usage
+## Common Use Cases
+Simple run. Get results from Google dorking and ARIN database:
+
+`python3 NetblockTool.py Company`
+
+Include the verbose flag to print status updates:
+
+`python3 NetblockTool.py -v Company`
+
+Extract netblocks owned by your target company’s subsidiaries:
+
+`python3 NetblockTool.py -v Company -s`
+
+Extract point of contact information:
+
+`python3 NetblockTool.py -v Company -p`
+
+Get as much information as possible, including netblocks found using wildcard queries, points of contact, geolocation data, and physical addresses:
+
+`python3 NetblockTool.py -wpgav Company -so`
+
+
+## Help
 ```
-root@kali:~# python3 NetblockTool.py 
+$ ./NetblockTool.py
 usage:
   _   _      _   _     _            _    _____           _
  | \ | | ___| |_| |__ | | ___   ___| | _|_   _|__   ___ | |
@@ -62,7 +80,7 @@ usage:
  | |\  |  __/ |_| |_) | | (_) | (__|   <  | | (_) | (_) | |
  |_| \_|\___|\__|_.__/|_|\___/ \___|_|\_\ |_|\___/ \___/|_|
 
-NetblockTool.py [options] {target company}
+./NetblockTool.py [options] {target company}
     Find netblocks owned by a company
 
 Positional arguments:
@@ -107,15 +125,11 @@ Examples:
     python NetblockTool.py -v Google
     python NetblockTool.py -so -wv Facebook -o Results
     python NetblockTool.py -gavl companies.txt
-
 ```
 
-## Dependencies
-Run `pip3 install <module name>` on the following modules:
-* netaddr
-* bs4
-* edgar
-* lxml
-* requests
 
-Alternatively, you can run `pip3 install -r requirements.txt`
+### This script isn't working
+Ensure the following:
+* Are all of the dependencies listed in `requirements.txt` installed?
+* Is the version of the installed `edgar` dependency 1.0.0?
+* Is the script printing out `Google CAPTCHA detected`? You may need to change your public IP or wait ~60 minutes to retrieve Google dorking results. 
