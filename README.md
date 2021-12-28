@@ -34,7 +34,7 @@ python3 NetblockTool.py -v Company
 ## Output
 Results are written to a CSV called *Company.csv* where *Company* is the provided company's name. The truncated output for Google is shown below.
 
-![NetblockOutput](https://blog.netspi.com/wp-content/uploads/2020/10/netblock_results.png) 
+![NetblockOutput](https://i.imgur.com/XpFNiO0.png) 
 
 
 ## How does this script work?
