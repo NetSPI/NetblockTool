@@ -13,7 +13,14 @@
 # Author:      Alex Poorman                                                    #
 # Sponsor:     NetSPI (https://netspi.com)                                     #
 #------------------------------------------------------------------------------#
-
+#   Mod:    EABASE 
+#   Date:   2022-02-07
+#   
+#   Notes:
+#   [1] https://github.com/NetSPI/NetblockTool
+#   [2] https://www.sec.gov/os/webmaster-faq#developers
+#
+#------------------------------------------------------------------------------
 
 # Modules & Imports
 from __future__ import absolute_import
@@ -107,6 +114,7 @@ STATES = ['afghanistan', 'ak', 'al', 'alabama', 'alaska', 'albania', 'alberta',
           'vietnam', 'virgin islands', 'virginia', 'vt', 'wa', 'washington',
           'west virginia', 'wi', 'wisconsin', 'wv', 'wy', 'wyoming', 'yemen',
           'zambia', 'zimbabwe','people\'s republic of china']
+
 EXT = ['llc', 'corp', 'corporation', 'inc', 'ltd', 'limited', '-cust', 'lp',
        'jv', 'pc', 'llp', 'lllp', 'pllc', 'dba', 'cust', 'co', 'company',
        'gmbh', 'ulc', 'sas', 'kk', 'bv', 'sl', 'sa de cv', 's de rl de cv',
@@ -939,6 +947,7 @@ def get_arin_objects(target_name):
     return_list = []
     blacklist = ['.html']
     data = 'flushCache=true&queryinput='+process_url_encode(target_name)+'&whoisSubmitButton=+'
+    
     headers = {'Host'          :   'whois.arin.net',
                'User-Agent'    :   'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:61.0) Gecko/20100101 Firefox/61.0',
                'Accept'        :   'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
@@ -948,8 +957,10 @@ def get_arin_objects(target_name):
                'Content-Type'  :   'application/x-www-form-urlencoded',
                'Content-Length':   str(len(data)),
                'Connection'    :   'close'}
+    
     req = requests.post('https://whois.arin.net/ui/query.do', data=data, headers=headers)
     response = str(req.text.encode('utf-8'))
+    
     urls = re.findall(r'[-a-zA-Z0-9@:%._\+~#=]{2,256}\.[a-z]{2,6}\b([-a-zA-Z0-9@:%_\+.~#?&//=]*)', response)
     for url in urls:
         if 'rest' in url:
@@ -991,6 +1002,7 @@ def get_customer_info(customer):
     # Get information
     handle = parsed['customer']['handle']['$']
     name = parsed['customer']['name']['$']
+    
     ## Network information
     try:
         start_net = parsed['customer']['nets']['netRef']['@startAddress']
@@ -998,6 +1010,7 @@ def get_customer_info(customer):
         net = netaddr.iprange_to_cidrs(start_net, end_net)[0]
     except KeyError:
         net = 'Error: no network information'
+    
     ## Address information
     try:
         return_street = parsed['customer']['streetAddress']['line']['$']
@@ -1184,8 +1197,10 @@ def get_asn_subnets(asn):
                'Accept-Language': 'en-US,en;q=0.5',
                'Accept-Encoding': 'gzip, deflate',
                'Connection'    : 'close'}
+    
     req = requests.get('https://ipinfo.io/'+process_url_encode(asn), headers=headers)
     soup = BeautifulSoup(req.text, 'html.parser')
+    
     for a in soup.find_all('a', text=True):
         if asn in str(a):
             return_list.append(str(a.text).strip())
@@ -1404,14 +1419,17 @@ def get_ip_coordinates(ip):
     """
     if '/' in ip:
         ip = ip.split('/')[0]
+
     headers = {'Host'          : 'ipinfo.io',
                'User-Agent'    : 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:66.0) Gecko/20100101 Firefox/66.0',
                'Accept'        : 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
                'Accept-Language': 'en-US,en;q=0.5',
                'Accept-Encoding': 'gzip, deflate',
                'Connection'    : 'close'}
+    
     req = requests.get('https://ipinfo.io/'+ip, headers=headers)
     response = req.text
+    
     tree = html.fromstring(response)
     coordinates = tree.xpath(
         '//*[@id=\"content\"]/section[1]/div/div[1]/div/div[1]/div/ul/li[4]/span[2]/text()')
@@ -1445,7 +1463,24 @@ def get_key_tag(soup, top_result):
     count_tags = sorted(count_tags, key=operator.itemgetter(0), reverse=True)
     return str(count_tags[top_result][1])
 
-
+#------------------------------------------------------------------------------
+#  Query SEC EDGAR
+#------------------------------------------------------------------------------
+#  Performs the follwing requests:
+#   [1] edgar.Edgar().findCompanyName(company_name)                     # find_company_name(self, words) -> List[str]:
+#   [2] edgar.Edgar().getCikByCompanyName(company)                      # get_cik_by_company_name(self, name) -> str:
+#   [3]     edgar.Company(sub_company_list[0], sub_company_list[1])     # 
+#   [4]     edgar.getDocuments(tree, noOfDocuments=5)                   # get_documents(cls, tree: html.HtmlElement, no_of_documents=1, debug=False, as_documents=False) -> List:
+#   [5] 4 x requests.get()
+#   
+#  Requirements:
+#   1. Need request headers: {host, user-agent, accept-encoding }
+#   2. Max 10 requests/second
+#
+#  Override Edgar for correcting headers:
+#   Company()::get_request(cls, href, isxml=False, timeout=10):
+#   Company()::_get(self, url):
+#------------------------------------------------------------------------------
 def get_subsidiaries(company_name, verbose, alt_method, quiet):
     """Returns a list of company subsidiaries.
 
@@ -1461,8 +1496,8 @@ def get_subsidiaries(company_name, verbose, alt_method, quiet):
             method should be used.
         quiet: A boolean that indicates that all status messages should be
             disabled.
-
     """
+
     #Local variables
     companies = []
     unique_companies = []
@@ -1470,6 +1505,34 @@ def get_subsidiaries(company_name, verbose, alt_method, quiet):
     dups = []
     document_status = 0
     subsid_enum_count = 0
+
+    headers = {
+        'user-agent': 'NetSPI oit@sec.gov',
+        'accept-encoding':  'gzip, deflate',
+        'host':  'www.sec.gov',
+        'referer': 'https://www.sec.gov/', 
+        'cache-control': 'no-cache', 
+        #'connection': 'close'
+       	#'connection': 'keep-alive'
+        }
+
+    sec_headers = headers
+
+    #------------------------------------------------------------------------------
+    # OVERRIDE: Company()::get_request(cls, href, isxml=False, timeout=10):
+    # OVERRIDE: Company()::_get(self, url):
+    # OVERRIDE: Requests::Utils::default_headers():
+    #
+    '''
+    def sec_get(self, url):
+        #edgar.Company._get(self, url, sec_headers)
+        #def _get(self, url):
+        #    return requests.get(url, timeout=self.timeout)
+        return requests.get(url, timeout=self.timeout, headers=sec_headers)
+    #------------------------------------------------------------------------------
+    oedge = edgar.Company()
+    edgar.Company._get = 
+    '''
 
     # Find Companies and CIKs from given company name
     if not quiet:
@@ -1480,11 +1543,16 @@ def get_subsidiaries(company_name, verbose, alt_method, quiet):
     else:
         if not quiet:
             print('  [*] Status: 1/3')
-    possible_companies = edgar.Edgar().findCompanyName(company_name)
+    
+    # find_company_name(self, words) -> List[str]:
+    #possible_companies = edgar.Edgar().findCompanyName(company_name)
+    possible_companies = edgar.Edgar().find_company_name(company_name) # words??
     for company in possible_companies:
         temp = []
         temp.append(company)
-        temp.append(edgar.Edgar().getCikByCompanyName(company))
+        # get_cik_by_company_name(self, name) -> str:
+        #temp.append(edgar.Edgar().getCikByCompanyName(company))
+        temp.append(edgar.Edgar().get_cik_by_company_name(company))
         companies.append(temp)
 
     # Get documents from CIK
@@ -1502,9 +1570,16 @@ def get_subsidiaries(company_name, verbose, alt_method, quiet):
         document_status += 1
         if verbose:
             print('    [*] Status: '+str(document_status)+'/'+str(len(unique_companies)))
+        
         company = edgar.Company(sub_company_list[0], sub_company_list[1])
-        tree = company.getAllFilings(filingType='10-K')
-        docs = edgar.getDocuments(tree, noOfDocuments=5)
+        # get_all_filings(self, filing_type="", prior_to="", ownership="include", no_of_entries=100) -> lxml.html.HtmlElement:
+        #tree = company.getAllFilings(filingType='10-K')
+        tree = company.get_all_filings(filing_type='10-K')
+    
+        # @classmethod
+        # def get_documents(cls, tree: html.HtmlElement, no_of_documents=1, debug=False, as_documents=False) -> List:
+        #docs = edgar.getDocuments(tree, noOfDocuments=5)
+        docs = edgar.Company.get_documents(tree, no_of_documents=5, debug=True)
         sub_company_list.append(len(docs))
 
     # If no documents were found, remove company
@@ -1517,13 +1592,17 @@ def get_subsidiaries(company_name, verbose, alt_method, quiet):
                   '/'+str(len(unique_companies))+' remain')
     else:
         if verbose:
-            print('  [!] No companies with document information were found for '+str(company_name)+'. Document information is needed to find subsidiaries.')
-            print('    [*] Note that when this occurs, it is likely that either the supplied company is a subsidiary if a holding company or that the company')
-            print('    [*]  submitted the required filing information via paper. Visit sec.gov/edgar/searchedgar/companysearch.html to find subsidiaries manually.')
+            print('  [!] No companies with document information were found for '+str(company_name)+'.')
+            print('      Document information is needed to find subsidiaries.')
+            print('    [*] Note that when this occurs, it is likely that either the supplied company is a subsidiary of a')
+            print('        holding company or that the company submitted the required filing information by paper or proxy.')
+            print('        I.e. A non-electronic filing. To manually find subsidiaries, please visit:')
+            print('        https://www.sec.gov/edgar/searchedgar/companysearch.html')
         else:
             if not quiet:
-                print('  [!] No companies with document information were found for '+str(company_name)+'. Document information is needed to find subsidiaries.')
-                print('    [*] Note that when this occurs, it is likely that the supplied company is a subsidiary if a holding company.')
+                print('  [!] No companies with document information were found for '+str(company_name)+'.')
+                print('      Document information is needed to find subsidiaries.')
+                print('    [*] Note that when this occurs, it is likely that the supplied company is a subsidiary of a holding company.')
         return return_list
 
     # Get list of subsidiaries
@@ -1551,13 +1630,16 @@ def get_subsidiaries(company_name, verbose, alt_method, quiet):
             ## Find Documents in search page and see if EX-21 documents are included
             if verbose:
                 print('    [*] Searching filings for EX-21 documents')
-            search_page = requests.get('https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK='+sub_list[1]+'&type=10-K&dateb=&owner=exclude&count=100')
+            
+            sec_url = 'https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK='+sub_list[1]+'&type=10-K&dateb=&owner=exclude&count=100'
+            search_page = requests.get(sec_url, headers=sec_headers)
+            
             search_tree = html.fromstring(search_page.text)
             elems = search_tree.xpath('//*[@id=\'documentsbutton\']')
             for elem in elems:
                 if not found:
                     url = 'https://www.sec.gov' + elem.attrib['href']
-                    test_ex21 = requests.get(url)
+                    test_ex21 = requests.get(url, headers=sec_headers)
                     if 'EX-21' in test_ex21.text:
                         found = True
                         found_url = url
@@ -1567,8 +1649,10 @@ def get_subsidiaries(company_name, verbose, alt_method, quiet):
             ## Download document that contains 'EX-21' in their type
             if verbose:
                 print('    [*] Downloading EX-21 document')
-            doc_page = requests.get(found_url)
+            
+            doc_page = requests.get(found_url, headers=sec_headers)
             doc_tree = html.fromstring(doc_page.text)
+            
             for i in range(1, 25):
                 if not found_subsid:
                     if 'EX-21' in str(doc_tree.xpath('//*[@id=\'formDiv\']/div/table/tr['+str(i)+']/td[4]/text()')):
@@ -1582,13 +1666,16 @@ def get_subsidiaries(company_name, verbose, alt_method, quiet):
             if subsid_url[-1] != '/':
                 if verbose:
                     print('    [*] Parsing subsidiaries')
-                subsid_page = requests.get(subsid_url)
+
+                subsid_page = requests.get(subsid_url, headers=sec_headers)
                 soup = BeautifulSoup(subsid_page.text, 'html.parser')
                 soup_tags = soup.find_all('font', text=True)
+                
                 for tag in soup_tags:
                     filter_result = process_potential_company(tag.text, str(sub_list[0]))
                     if filter_result:
                         result_list.append(filter_result)
+                
                 ### Check to see if low list; if true, try most popular tag
                 if len(result_list) < 5:
                     result_list.clear()
@@ -1598,6 +1685,7 @@ def get_subsidiaries(company_name, verbose, alt_method, quiet):
                         filter_result = process_potential_company(tag.text, str(sub_list[0]))
                         if filter_result:
                             result_list.append(filter_result)
+                    
                     ### Check to see if low list still; if true, try second most popular tag
                     if len(result_list) < 5:
                         result_list.clear()
@@ -1616,6 +1704,7 @@ def get_subsidiaries(company_name, verbose, alt_method, quiet):
                                 filter_result = process_potential_company(tag.text, str(sub_list[0]))
                                 if filter_result:
                                     result_list.append(filter_result)
+                
                 ## Actions to take if user specified alternative method usage
                 if alt_method:
                     result_list2 = []
@@ -1623,10 +1712,12 @@ def get_subsidiaries(company_name, verbose, alt_method, quiet):
                     ### Try alternative tags to see if more accurate - 1st frequent tag
                     key_tag = get_key_tag(soup, 1)
                     soup_tags = soup.find_all(key_tag, text=True)
+                    
                     for tag in soup_tags:
                         filter_result = process_potential_company(tag.text, str(sub_list[0]))
                         if filter_result:
                             result_list2.append(filter_result)
+                    
                     ### Try alternative tags to see if more accurate - 2nd frequent tag
                     key_tag = get_key_tag(soup, 2)
                     soup_tags = soup.find_all(key_tag, text=True)
@@ -1634,6 +1725,7 @@ def get_subsidiaries(company_name, verbose, alt_method, quiet):
                         filter_result = process_potential_company(tag.text, str(sub_list[0]))
                         if filter_result:
                             result_list3.append(filter_result)
+                    
                     ### Test which list has the most entries
                     if (len(set(result_list)) > len(set(result_list2))) and (len(set(result_list)) > len(set(result_list3))):
                         return_list = sorted(set(result_list))
@@ -1649,11 +1741,15 @@ def get_subsidiaries(company_name, verbose, alt_method, quiet):
                 print('  [!] ERROR: No EX-21 data found, error fetching subsidiaries')
             else:
                 print('  [!] ERROR: Unable to fetch subsidiaries')
+        # SEC EDGAR Rate Limit:  10 req/sec
+        time.sleep(0.5)
 
     # Return subsidiary results
     return sorted(return_list)
 
-
+#------------------------------------------------------------------------------
+# Google 
+#------------------------------------------------------------------------------
 def get_google_networks(target, verbose, quiet):
     """Retrieves networks from Google.
 
@@ -1678,6 +1774,7 @@ def get_google_networks(target, verbose, quiet):
     """
     # Local variables
     search_term = 'site:ipinfo.io "'+target+'" "netblock details"'
+
     headers =   {   'Host': 'www.google.com',
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:68.0) Gecko/20100101 Firefox/68.0',
                     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
@@ -1848,17 +1945,17 @@ def get_statistics(netblock_list, subsid_mode):
 
 
 def get_usage():
-    """Returns the usage and help information for this tool.
-    """
-    return'''
+    return '''
   _   _      _   _     _            _    _____           _
  | \ | | ___| |_| |__ | | ___   ___| | _|_   _|__   ___ | |
  |  \| |/ _ \ __| '_ \| |/ _ \ / __| |/ / | |/ _ \ / _ \| |
  | |\  |  __/ |_| |_) | | (_) | (__|   <  | | (_) | (_) | |
  |_| \_|\___|\__|_.__/|_|\___/ \___|_|\_\ |_|\___/ \___/|_|
 
-%s [options] {target company}
     Find netblocks owned by a company
+
+Usage: 
+    %s [options] {target company}
 
 Positional arguments:
     {target} Target company (exclude "Inc", "Corp", etc.)
@@ -1874,29 +1971,29 @@ Optional arguments:
     Data Retrieval & Processing:
     -n        Don't perform thorough wildcard queries (query = target)
     -ng       Don't perform Google Dorking queries
-    -w        Perform more thorough complete wildcard queries (query = *target*). Note
-                  that this option may return significantly more false positives.
+    -w        Perform more thorough complete wildcard queries (query = *target*). 
+                Note: This option may return significantly more false positives.
     -c        Company name if different than target (may affect accuracy of confidence
-                  scores, use carefully; exclude "Inc", "Corp", etc.)
+              scores, use carefully; exclude "Inc", "Corp", etc.)
     -e        Only return results greater than a given confidence score
-    -p        Retrieve and write point of contact information to a text file. Note that
-                  retrieval of PoC information will likely take some time.
+    -p        Retrieve and write point of contact information to a text file. 
+                Note that retrieval of PoC information will likely take some time.
     -4        Only return IPv4 netblocks
     -6        Only return IPv6 netblocks
 
     Company Subsidiaries:
     -s        Fetch subsidiary information and return netblocks of all subsidiaries in
-                  addition to initial target
+                addition to initial target
     -sn       Company name to use when fetching subsidiaries
     -sp       Use alternate parsing method when fetching subsidiary information; use
-                  if the default method isn't working as expected
+                if the default method isn't working as expected
     -so       Write subsidiary information to a text file (CompanyName_subsidiaries.txt)
 
     Physical Location:
     -g        Retrieve geolocation data (if available)
     -a        Write netblock address information to output
     -ag       Write netblock address information to output but only if it contains a
-                  given string
+                given string
 
 Examples:
     python NetblockTool.py -v Google
@@ -1909,26 +2006,27 @@ Examples:
 if __name__ == '__main__':
     # Parse arguments
     parser = argparse.ArgumentParser(description='Find netblocks owned by a company', add_help=False, usage=get_usage())
-    parser.add_argument('target', help='Target company (exclude "Inc", "Corp", etc.')
+    parser.add_argument('target',               help='Target company (exclude "Inc", "Corp", etc.')
     parser.add_argument('-c', '--company-name', help='Company name if different than target (may affect accuracy of confidence scores, use carefully; exclude "Inc", "Corp", etc.)')
-    parser.add_argument('-l', '--list', help='List mode; argument is a file with list of companies, one per line', action='store_true')
-    parser.add_argument('-n', '--no-wildcard', help='Don\'t perform thorough wildcard queries', action='store_true')
-    parser.add_argument('-w', '--wildcard', help='Perform more thorough complete wildcard queries', action='store_true')
-    parser.add_argument('-o', '--output', help='File name to write data to (no extension, default is target name)')
-    parser.add_argument('-e', '--threshold', help='Only return results greater than a given confidence score')
-    parser.add_argument('-g', '--geolocation', help='Retrieve geolocation data (if available)', action='store_true')
-    parser.add_argument('-a', '--address-out', help='Write netblock address information to output', action='store_true')
+    parser.add_argument('-l', '--list',         help='List mode; argument is a file with list of companies, one per line', action='store_true')
+    parser.add_argument('-n', '--no-wildcard',  help='Don\'t perform thorough wildcard queries', action='store_true')
+    parser.add_argument('-w', '--wildcard',     help='Perform more thorough complete wildcard queries', action='store_true')
+    parser.add_argument('-o', '--output',       help='File name to write data to (no extension, default is target name)')
+    parser.add_argument('-e', '--threshold',    help='Only return results greater than a given confidence score')
+    parser.add_argument('-g', '--geolocation',  help='Retrieve geolocation data (if available)', action='store_true')
+    parser.add_argument('-a', '--address-out',  help='Write netblock address information to output', action='store_true')
     parser.add_argument('-ag', '--address-grep', help='Write netblock address information to output but only if it contains a given string')
-    parser.add_argument('-s', '--subsidiary', help='Fetch subsidiary information and return netblocks of all subsidiaries in addition to initial target', action='store_true')
-    parser.add_argument('-sp', '--subsidiary-parse-alt', help='Use alternate parsing method when fetching subsidiary information; use if the default method isn\'t working as expected', action='store_true')
-    parser.add_argument('-so', '--subsidiary-out', help='Write subsidiary information to a text file (file=Company_subsidiaries.txt)', action='store_true')
-    parser.add_argument('-sn', '--subsidiary-name', help='Company name to use when fetching subsidiaries')
-    parser.add_argument('-p', '--poc-out', help='Retrieve and write point of contact information to a text file. Note that retrieval of PoC information will likely take some time.', action='store_true')
-    parser.add_argument('-4', '--ipv4', help='Only return IPv4 netblocks', action='store_true')
-    parser.add_argument('-6', '--ipv6', help='Only return IPv6 netblocks', action='store_true')
-    parser.add_argument('-v', '--verbose', help='Verbose mode', action='store_true')
-    parser.add_argument('-q', '--quiet', help='Quiet mode', action='store_true')
-    parser.add_argument('-ng', '--no-google', help='Don\'t perform Google Dorking queries', action='store_true')
+    parser.add_argument('-s', '--subsidiary',   help='Fetch subsidiary information and return netblocks of all subsidiaries in addition to initial target', action='store_true')
+    parser.add_argument('-sp', '--subsidiary-parse-alt',    help='Use alternate parsing method when fetching subsidiary information; use if the default method isn\'t working as expected', action='store_true')
+    parser.add_argument('-so', '--subsidiary-out',          help='Write subsidiary information to a text file (file=Company_subsidiaries.txt)', action='store_true')
+    parser.add_argument('-sn', '--subsidiary-name',         help='Company name to use when fetching subsidiaries')
+    parser.add_argument('-p', '--poc-out',      help='Retrieve and write point of contact information to a text file. Note that retrieval of PoC information will likely take some time.', action='store_true')
+    parser.add_argument('-4', '--ipv4',         help='Only return IPv4 netblocks', action='store_true')
+    parser.add_argument('-6', '--ipv6',         help='Only return IPv6 netblocks', action='store_true')
+    parser.add_argument('-v', '--verbose',      help='Verbose mode', action='store_true')
+    parser.add_argument('-q', '--quiet',        help='Quiet mode', action='store_true')
+    parser.add_argument('-ng', '--no-google',   help='Don\'t perform Google Dorking queries', action='store_true')
+    
     args = parser.parse_args()
     arg_target = str(args.target)
     arg_company_name = args.company_name
@@ -1952,11 +2050,15 @@ if __name__ == '__main__':
     arg_version = None
     arg_no_google = args.no_google
 
+    #--------------------------------------------
     # Argument validation
+    #--------------------------------------------
+
     ## Check to see if both 'no wildcard' and 'wildcard' are set
     if (arg_no_wildcard and arg_wildcard):
         print(sys.argv[0], ': error: Cannot specify both no wildcard (-n) and wildcard (-w) options')
         sys.exit()
+    
     ## Ensure an integer was provided
     if arg_threshold:
         try:
@@ -1964,6 +2066,7 @@ if __name__ == '__main__':
         except ValueError:
             print(sys.argv[0], ': error: Provided value for confidence score threshold must be an integer')
             sys.exit()
+    
     ## Validate & standardize address grep argument
     try:
         if (len(arg_address_grep) > 0 and not arg_address):
@@ -1971,6 +2074,7 @@ if __name__ == '__main__':
             arg_address_grep = arg_address_grep.lower()
     except TypeError:
         arg_address_grep = ''
+    
     ## Check to see if 'subsidiary alternate method' is set but 'subsidiary' is not
     if (not arg_subsid and arg_subsid_alt):
         arg_subsid = True
@@ -1995,6 +2099,7 @@ if __name__ == '__main__':
     if (arg_verbose and arg_quiet):
         print(sys.argv[0], ': error: Cannot use both verbose mode (-v) and quiet mode (-q)')
         sys.exit()
+    
     ## Check IP version
     if (arg_ipv4 and arg_ipv6):
         arg_version = None
@@ -2002,6 +2107,7 @@ if __name__ == '__main__':
         arg_version = 4
     elif arg_ipv6:
         arg_version = 6
+    
     ## Process output
     if not arg_output:
         arg_output = process_output_name(arg_target)+'.csv'
@@ -2052,6 +2158,7 @@ if __name__ == '__main__':
             print(sys.argv[0], ':', e)
             print(sys.argv[0], ': Make sure you\'re including the file extension')
             sys.exit()
+        
         for company in companies:
             try:
                 company_status += 1
@@ -2089,9 +2196,11 @@ if __name__ == '__main__':
                         data_file.write(str(company)+'\n')
             if arg_target not in companies:
                 companies.append(str(arg_target))
+            
             companies = process_company_extension(companies)
             company_status = 0
             all_netblocks = []
+            
             for company in companies:
                 company_status += 1
                 if arg_no_wildcard:
@@ -2107,6 +2216,7 @@ if __name__ == '__main__':
                     netblocks = results[0]
                     csv_headers = results[1]
                     all_netblocks.append(netblocks)
+            
             # Process combined list before write
             if all_netblocks:
                 all_netblocks = [item for sublist in all_netblocks for item in sublist]
@@ -2129,6 +2239,7 @@ if __name__ == '__main__':
             print(sys.argv[0], ':', e)
             print(sys.argv[0], ': Make sure you\'re including the file extension')
             sys.exit()
+        
         try:
             for init_company in list_companies:
                 overall_company_status += 1
@@ -2137,6 +2248,7 @@ if __name__ == '__main__':
                 company_status = 0
                 companies = []
                 all_netblocks = []
+                
                 # Get subsidiary info
                 for result in get_subsidiaries(init_company, arg_verbose, arg_subsid_alt, arg_quiet):
                     companies.append(result)
@@ -2150,6 +2262,7 @@ if __name__ == '__main__':
                             data_file.write(str(company)+'\n')
                 companies.append(init_company)
                 companies = process_company_extension(companies)
+                
                 # Get netblocks
                 for company in companies:
                     if arg_no_wildcard:
@@ -2166,12 +2279,14 @@ if __name__ == '__main__':
                         netblocks = results[0]
                         csv_headers = results[1]
                         all_netblocks.append(netblocks)
+                
                 # Process combined list before write
                 if all_netblocks:
                     all_netblocks = [item for sublist in all_netblocks for item in sublist]
                     all_netblocks = sorted(all_netblocks, key=operator.itemgetter(4), reverse=True)
                     process_output_file(all_netblocks, str(process_output_name(init_company))+'_subsidiaries.csv', csv_headers)
                     get_statistics(all_netblocks, arg_subsid)
+        
         except KeyboardInterrupt:
             print('\n\n[!] WARNING: Interrupt signal received, quitting script\n')
             sys.exit()

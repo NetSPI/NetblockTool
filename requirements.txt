@@ -1,5 +1,5 @@
 netaddr
 bs4
-edgar==1.0.0
+edgar
 lxml
 requests
