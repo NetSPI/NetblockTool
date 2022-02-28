@@ -106,7 +106,10 @@ STATES = ['afghanistan', 'ak', 'al', 'alabama', 'alaska', 'albania', 'alberta',
           'uzbekistan', 'va', 'vanuatu', 'vatican city', 'venezuela', 'vermont',
           'vietnam', 'virgin islands', 'virginia', 'vt', 'wa', 'washington',
           'west virginia', 'wi', 'wisconsin', 'wv', 'wy', 'wyoming', 'yemen',
-          'zambia', 'zimbabwe','people\'s republic of china']
+          'zambia', 'zimbabwe','people\'s republic of china', 'isle of man',
+          'the netherlands', 'serbia & montenegro', 'serbia and montenegro',
+          'british virgin islands', 'bosnia & herzogovina',
+          'bosnia and herzogovina']
 EXT = ['llc', 'corp', 'corporation', 'inc', 'ltd', 'limited', '-cust', 'lp',
        'jv', 'pc', 'llp', 'lllp', 'pllc', 'dba', 'cust', 'co', 'company',
        'gmbh', 'ulc', 'sas', 'kk', 'bv', 'sl', 'sa de cv', 's de rl de cv',
@@ -115,6 +118,7 @@ EXT = ['llc', 'corp', 'corporation', 'inc', 'ltd', 'limited', '-cust', 'lp',
        'plc', 'sàrl', 'sarl', 'ag', 'sa', 'scs', 'nv', 'companies',
        'incorporated', 'pte', 'aps', 'pty', 'aeie', 'snc', 'sp zoo', 'fzco',
        'dwc-llc', 'ltda', 'group', 'of', 'private']
+USER_AGENT = 'CompanyName Name email@companyname.com'
 
 
 def main(passed_target, passed_company_name, passed_query, passed_verbose,
@@ -748,7 +752,7 @@ def process_potential_company(test_string, company_name):
                  'ownership %', 'state or', 'provinceof', 'rule 1-02', 'of organization',
                  'owneddirectly', 'percentageof', 'stateor', 'orindirectly by',
                  'of incorporation', 'or organization', 'item 601', 'reg s-k', 'no fear act',
-                 'directory listing']
+                 'directory listing', 'click here']
     blacklist_equal = ['site map', 'contact', 'links', 'careers', 'plain writing',
                        'contracts', 'organization', 'incorporation', 'education',
                        'open government', 'enforcement', 'notes:', 'names under which', 'usa.gov',
@@ -1480,11 +1484,11 @@ def get_subsidiaries(company_name, verbose, alt_method, quiet):
     else:
         if not quiet:
             print('  [*] Status: 1/3')
-    possible_companies = edgar.Edgar().findCompanyName(company_name)
+    possible_companies = edgar.Edgar(user_agent=USER_AGENT).find_company_name(company_name)
     for company in possible_companies:
         temp = []
         temp.append(company)
-        temp.append(edgar.Edgar().getCikByCompanyName(company))
+        temp.append(edgar.Edgar(user_agent=USER_AGENT).get_cik_by_company_name(company))
         companies.append(temp)
 
     # Get documents from CIK
@@ -1502,9 +1506,9 @@ def get_subsidiaries(company_name, verbose, alt_method, quiet):
         document_status += 1
         if verbose:
             print('    [*] Status: '+str(document_status)+'/'+str(len(unique_companies)))
-        company = edgar.Company(sub_company_list[0], sub_company_list[1])
-        tree = company.getAllFilings(filingType='10-K')
-        docs = edgar.getDocuments(tree, noOfDocuments=5)
+        company = edgar.Company(sub_company_list[0], sub_company_list[1], user_agent=USER_AGENT)
+        tree = company.get_all_filings(filing_type='10-K')
+        docs = edgar.Company.get_documents(tree, no_of_documents=5)
         sub_company_list.append(len(docs))
 
     # If no documents were found, remove company
@@ -1551,13 +1555,13 @@ def get_subsidiaries(company_name, verbose, alt_method, quiet):
             ## Find Documents in search page and see if EX-21 documents are included
             if verbose:
                 print('    [*] Searching filings for EX-21 documents')
-            search_page = requests.get('https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK='+sub_list[1]+'&type=10-K&dateb=&owner=exclude&count=100')
+            search_page = requests.get('https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK='+sub_list[1]+'&type=10-K&dateb=&owner=exclude&count=100', headers={'User-Agent': USER_AGENT})
             search_tree = html.fromstring(search_page.text)
             elems = search_tree.xpath('//*[@id=\'documentsbutton\']')
             for elem in elems:
                 if not found:
                     url = 'https://www.sec.gov' + elem.attrib['href']
-                    test_ex21 = requests.get(url)
+                    test_ex21 = requests.get(url, headers={'User-Agent': USER_AGENT})
                     if 'EX-21' in test_ex21.text:
                         found = True
                         found_url = url
@@ -1567,7 +1571,7 @@ def get_subsidiaries(company_name, verbose, alt_method, quiet):
             ## Download document that contains 'EX-21' in their type
             if verbose:
                 print('    [*] Downloading EX-21 document')
-            doc_page = requests.get(found_url)
+            doc_page = requests.get(found_url, headers={'User-Agent': USER_AGENT})
             doc_tree = html.fromstring(doc_page.text)
             for i in range(1, 25):
                 if not found_subsid:
@@ -1582,7 +1586,7 @@ def get_subsidiaries(company_name, verbose, alt_method, quiet):
             if subsid_url[-1] != '/':
                 if verbose:
                     print('    [*] Parsing subsidiaries')
-                subsid_page = requests.get(subsid_url)
+                subsid_page = requests.get(subsid_url, headers={'User-Agent': USER_AGENT})
                 soup = BeautifulSoup(subsid_page.text, 'html.parser')
                 soup_tags = soup.find_all('font', text=True)
                 for tag in soup_tags:
@@ -1891,6 +1895,8 @@ Optional arguments:
     -sp       Use alternate parsing method when fetching subsidiary information; use
                   if the default method isn't working as expected
     -so       Write subsidiary information to a text file (CompanyName_subsidiaries.txt)
+    -u        Identifying information to send to SEC, default: "CompanyName Name 
+                  email@companyname.com". See https://www.sec.gov/os/accessing-edgar-data
 
     Physical Location:
     -g        Retrieve geolocation data (if available)
@@ -1923,6 +1929,7 @@ if __name__ == '__main__':
     parser.add_argument('-sp', '--subsidiary-parse-alt', help='Use alternate parsing method when fetching subsidiary information; use if the default method isn\'t working as expected', action='store_true')
     parser.add_argument('-so', '--subsidiary-out', help='Write subsidiary information to a text file (file=Company_subsidiaries.txt)', action='store_true')
     parser.add_argument('-sn', '--subsidiary-name', help='Company name to use when fetching subsidiaries')
+    parser.add_argument('-u', '--user-agent', help='Identifying information to send to SEC, default: "CompanyName Name email@companyname.com". See https://www.sec.gov/os/accessing-edgar-data')
     parser.add_argument('-p', '--poc-out', help='Retrieve and write point of contact information to a text file. Note that retrieval of PoC information will likely take some time.', action='store_true')
     parser.add_argument('-4', '--ipv4', help='Only return IPv4 netblocks', action='store_true')
     parser.add_argument('-6', '--ipv6', help='Only return IPv6 netblocks', action='store_true')
@@ -2010,6 +2017,9 @@ if __name__ == '__main__':
             arg_output = process_output_name(arg_output)+'.csv'
         else:
             arg_output = process_output_name(arg_output)
+    ## Set USER_AGENT
+    if args.user_agent:
+        USER_AGENT = str(args.user_agent)
 
     # Print banner
     if not arg_quiet:
