@@ -1,5 +1,7 @@
 netaddr
 bs4
-edgar>=5.4.1
 lxml
 requests
+Levenshtein
+fuzzywuzzy
+tqdm

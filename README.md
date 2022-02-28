@@ -131,5 +131,6 @@ Examples:
 ### This script isn't working
 Ensure the following:
 * Are all of the dependencies listed in `requirements.txt` installed?
-* Is the version of the installed `edgar` dependency 1.0.0?
+* Is the `edgar` folder in this repository in the same folder as the NetblockTool.py script?
 * Is the script printing out `Google CAPTCHA detected`? You may need to change your public IP or wait ~60 minutes to retrieve Google dorking results. 
+* You may need to use Python 3.7+
