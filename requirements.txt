@@ -2,6 +2,5 @@ netaddr
 bs4
 lxml
 requests
-Levenshtein
 fuzzywuzzy
 tqdm
