@@ -1583,71 +1583,72 @@ def get_subsidiaries(company_name, verbose, alt_method, quiet):
 
             ## Get and enumerate subsidiaries
             ## Ensure that a document was retrieved and not a directory
-            if subsid_url[-1] != '/':
-                if verbose:
-                    print('    [*] Parsing subsidiaries')
-                subsid_page = requests.get(subsid_url, headers={'User-Agent': USER_AGENT})
-                soup = BeautifulSoup(subsid_page.text, 'html.parser')
-                soup_tags = soup.find_all('font', text=True)
-                for tag in soup_tags:
-                    filter_result = process_potential_company(tag.text, str(sub_list[0]))
-                    if filter_result:
-                        result_list.append(filter_result)
-                ### Check to see if low list; if true, try most popular tag
-                if len(result_list) < 5:
-                    result_list.clear()
-                    key_tag = get_key_tag(soup, 1)
-                    soup_tags = soup.find_all(key_tag, text=True)
+            if subsid_url:
+                if subsid_url[-1] != '/':
+                    if verbose:
+                        print('    [*] Parsing subsidiaries')
+                    subsid_page = requests.get(subsid_url, headers={'User-Agent': USER_AGENT})
+                    soup = BeautifulSoup(subsid_page.text, 'html.parser')
+                    soup_tags = soup.find_all('font', text=True)
                     for tag in soup_tags:
                         filter_result = process_potential_company(tag.text, str(sub_list[0]))
                         if filter_result:
                             result_list.append(filter_result)
-                    ### Check to see if low list still; if true, try second most popular tag
+                    ### Check to see if low list; if true, try most popular tag
                     if len(result_list) < 5:
                         result_list.clear()
-                        key_tag = get_key_tag(soup, 2)
+                        key_tag = get_key_tag(soup, 1)
                         soup_tags = soup.find_all(key_tag, text=True)
                         for tag in soup_tags:
                             filter_result = process_potential_company(tag.text, str(sub_list[0]))
                             if filter_result:
                                 result_list.append(filter_result)
-                        ### If we get to this point, it's most likely that the company has a
-                        ###  low number of subsidiaries, so return the original list
+                        ### Check to see if low list still; if true, try second most popular tag
                         if len(result_list) < 5:
                             result_list.clear()
-                            soup_tags = soup.find_all('font', text=True)
+                            key_tag = get_key_tag(soup, 2)
+                            soup_tags = soup.find_all(key_tag, text=True)
                             for tag in soup_tags:
                                 filter_result = process_potential_company(tag.text, str(sub_list[0]))
                                 if filter_result:
                                     result_list.append(filter_result)
-                ## Actions to take if user specified alternative method usage
-                if alt_method:
-                    result_list2 = []
-                    result_list3 = []
-                    ### Try alternative tags to see if more accurate - 1st frequent tag
-                    key_tag = get_key_tag(soup, 1)
-                    soup_tags = soup.find_all(key_tag, text=True)
-                    for tag in soup_tags:
-                        filter_result = process_potential_company(tag.text, str(sub_list[0]))
-                        if filter_result:
-                            result_list2.append(filter_result)
-                    ### Try alternative tags to see if more accurate - 2nd frequent tag
-                    key_tag = get_key_tag(soup, 2)
-                    soup_tags = soup.find_all(key_tag, text=True)
-                    for tag in soup_tags:
-                        filter_result = process_potential_company(tag.text, str(sub_list[0]))
-                        if filter_result:
-                            result_list3.append(filter_result)
-                    ### Test which list has the most entries
-                    if (len(set(result_list)) > len(set(result_list2))) and (len(set(result_list)) > len(set(result_list3))):
-                        return_list = sorted(set(result_list))
-                    if (len(set(result_list2)) > len(set(result_list))) and (len(set(result_list2)) > len(set(result_list3))):
-                        return_list = sorted(set(result_list2))
-                    if (len(set(result_list3)) > len(set(result_list))) and (len(set(result_list3)) > len(set(result_list2))):
-                        return_list = sorted(set(result_list3))
-                else:
-                    for company in set(result_list):
-                        return_list.append(company)
+                            ### If we get to this point, it's most likely that the company has a
+                            ###  low number of subsidiaries, so return the original list
+                            if len(result_list) < 5:
+                                result_list.clear()
+                                soup_tags = soup.find_all('font', text=True)
+                                for tag in soup_tags:
+                                    filter_result = process_potential_company(tag.text, str(sub_list[0]))
+                                    if filter_result:
+                                        result_list.append(filter_result)
+                    ## Actions to take if user specified alternative method usage
+                    if alt_method:
+                        result_list2 = []
+                        result_list3 = []
+                        ### Try alternative tags to see if more accurate - 1st frequent tag
+                        key_tag = get_key_tag(soup, 1)
+                        soup_tags = soup.find_all(key_tag, text=True)
+                        for tag in soup_tags:
+                            filter_result = process_potential_company(tag.text, str(sub_list[0]))
+                            if filter_result:
+                                result_list2.append(filter_result)
+                        ### Try alternative tags to see if more accurate - 2nd frequent tag
+                        key_tag = get_key_tag(soup, 2)
+                        soup_tags = soup.find_all(key_tag, text=True)
+                        for tag in soup_tags:
+                            filter_result = process_potential_company(tag.text, str(sub_list[0]))
+                            if filter_result:
+                                result_list3.append(filter_result)
+                        ### Test which list has the most entries
+                        if (len(set(result_list)) > len(set(result_list2))) and (len(set(result_list)) > len(set(result_list3))):
+                            return_list = sorted(set(result_list))
+                        if (len(set(result_list2)) > len(set(result_list))) and (len(set(result_list2)) > len(set(result_list3))):
+                            return_list = sorted(set(result_list2))
+                        if (len(set(result_list3)) > len(set(result_list))) and (len(set(result_list3)) > len(set(result_list2))):
+                            return_list = sorted(set(result_list3))
+                    else:
+                        for company in set(result_list):
+                            return_list.append(company)
         except requests.exceptions.MissingSchema:
             if not quiet:
                 print('  [!] ERROR: No EX-21 data found, error fetching subsidiaries')
@@ -1895,7 +1896,7 @@ Optional arguments:
     -sp       Use alternate parsing method when fetching subsidiary information; use
                   if the default method isn't working as expected
     -so       Write subsidiary information to a text file (CompanyName_subsidiaries.txt)
-    -u        Identifying information to send to SEC, default: "CompanyName Name 
+    -u        Identifying information to send to SEC, default: "CompanyName Name
                   email@companyname.com". See https://www.sec.gov/os/accessing-edgar-data
 
     Physical Location:
