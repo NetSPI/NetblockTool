@@ -42,6 +42,10 @@ requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 requests.packages.urllib3.util.ssl_.DEFAULT_CIPHERS += 'HIGH:!DH:!aNULL'
 
 
+# Program details
+__authors__ = ['Alex Poorman', 'NetSPI']
+__version__ = '2.0.0'
+
 # Global variables
 STATES = ['afghanistan', 'ak', 'al', 'alabama', 'alaska', 'albania', 'alberta',
           'algeria', 'american samoa', 'andorra', 'angola', 'antigua & deps',
@@ -160,6 +164,7 @@ def main(passed_target, passed_company_name, passed_query, passed_verbose,
     arin_pocs_unique = []
     google_networks = []
     arin_object_count = 0
+    attempts = 20
 
     # Get networks from Google
     if not no_google:
@@ -188,31 +193,76 @@ def main(passed_target, passed_company_name, passed_query, passed_verbose,
         for item in arin_objects:
             arin_object_count += 1
             if verbose:
-                print('  ['+str(arin_object_count)+'/'+str(len(arin_objects))+']', item, ' '*20, end='\r')
+                print('  ['+str(arin_object_count)+'/'+str(len(arin_objects))+']', item, ' '*50, end='\r')
             if '/rest/net' in item and not item.endswith('/rdns'):
                 if not item.endswith('/resources'):
                     if not item.endswith('/pocs'):
-                        initial_net = get_net_info(item)
-                        for net in initial_net:
-                            arin_net.append(net)
+                        success = False
+                        for attempt in range(1, attempts+1):
+                            try:
+                                initial_net = get_net_info(item)
+                                for net in initial_net:
+                                    arin_net.append(net)
+                                success = True
+                                break
+                            except requests.exceptions.RequestException:
+                                None
+                        if not success:
+                            print('  [!] Unable to retrieve details for ' + item, ' ' * 20)
             elif '/rest/asn' in item and not item.endswith('/pocs'):
-                initial_asn = get_asn_info(item)
-                for net in initial_asn:
-                    arin_asn.append(net)
+                success = False
+                for attempt in range(1, attempts+1):
+                    try:
+                        initial_asn = get_asn_info(item)
+                        for net in initial_asn:
+                            arin_asn.append(net)
+                        success = True
+                        break
+                    except requests.exceptions.RequestException:
+                        None
+                if not success:
+                    print('  [!] Unable to retrieve details for ' + item, ' ' * 20)
             elif '/rest/customer' in item:
-                return_cust = get_customer_info(item)
-                arin_net.append(return_cust)
-                arin_customer.append(return_cust)
+                success = False
+                for attempt in range(1, attempts+1):
+                    try:
+                        return_cust = get_customer_info(item)
+                        arin_net.append(return_cust)
+                        arin_customer.append(return_cust)
+                        success = True
+                        break
+                    except requests.exceptions.RequestException:
+                        None
+                if not success:
+                    print('  [!] Unable to retrieve details for ' + item, ' ' * 20)
             elif '/rest/org' in item and not item.endswith('/pocs'):
-                arin_org_addresses.append(get_org_address_info(item))
-                if query_poc:
-                    for contact in get_org_poc_info(item):
-                        arin_pocs.append(contact)
+                success = False
+                for attempt in range(1, attempts+1):
+                    try:
+                        arin_org_addresses.append(get_org_address_info(item))
+                        if query_poc:
+                            for contact in get_org_poc_info(item):
+                                arin_pocs.append(contact)
+                        success = True
+                        break
+                    except requests.exceptions.RequestException:
+                        None
+                if not success:
+                    print('  [!] Unable to retrieve details for ' + item, ' ' * 20)
             if query_poc:
                 if '/rest/poc/' in item:
                     if item not in retrieved_pocs:
-                        arin_pocs.append(get_poc_info(item))
-                        retrieved_pocs.append(item)
+                        success = False
+                        for attempt in range(1, attempts+1):
+                            try:
+                                arin_pocs.append(get_poc_info(item))
+                                retrieved_pocs.append(item)
+                                success = True
+                                break
+                            except requests.exceptions.RequestException:
+                                None
+                        if not success:
+                            print('  [!] Unable to retrieve details for ' + item, ' ' * 20)
 
     if (arin_objects) or (google_networks):
         # If PoC info was requested, deduplicate, sort, and write to file
@@ -1224,28 +1274,41 @@ def get_org_address_info(org):
         return_street = parsed['org']['streetAddress']['line']['$']
         address += str(return_street)
     except TypeError:
-        # If multiple lines for address, get number of lines & iterate
-        i = 0
-        for line in parsed['org']['streetAddress']['line']:
-            if len(address) <= 0:
-                address += str(parsed['org']['streetAddress']['line'][i]['$']).rstrip()
-            else:
-                address += ', '+str(parsed['org']['streetAddress']['line'][i]['$']).rstrip()
-            i += 1
+        try:
+            # If multiple lines for address, get number of lines & iterate
+            i = 0
+            for line in parsed['org']['streetAddress']['line']:
+                if len(address) <= 0:
+                    address += str(parsed['org']['streetAddress']['line'][i]['$']).rstrip()
+                else:
+                    address += ', '+str(parsed['org']['streetAddress']['line'][i]['$']).rstrip()
+                i += 1
+        except TypeError:
+            None
+        except KeyError:
+            None
+    except KeyError:
+        None
     try:
         return_city = parsed['org']['city']['$']
         address += ', '+str(return_city)
     except KeyError:
+        None
+    except TypeError:
         None
     try:
         return_country = parsed['org']['iso3166-1']['name']['$']
         address += ', '+str(return_country)
     except KeyError:
         None
+    except TypeError:
+        None
     try:
         return_postal = parsed['org']['postalCode']['$']
         address += ', '+str(return_postal)
     except KeyError:
+        None
+    except TypeError:
         None
     if address[0] == ',':
         address = address.split(',')[1]
@@ -1332,6 +1395,8 @@ def get_poc_info(poc):
                 email += str(parsed['poc']['emails']['email'][i]['$']).rstrip()
             else:
                 email += ', '+str(parsed['poc']['emails']['email'][i]['$']).rstrip()
+    except KeyError:
+        email = ''
 
     # Get phone number or numbers
     try:

@@ -3,7 +3,12 @@ from lxml import html
 from tqdm import tqdm
 import os
 import requests
-from fuzzywuzzy import process, fuzz
+import warnings
+
+# Suppress warning for python-Levenshtein
+with warnings.catch_warnings():
+    warnings.filterwarnings("ignore", category=UserWarning)
+    from fuzzywuzzy import process, fuzz
 
 class Edgar():
 
