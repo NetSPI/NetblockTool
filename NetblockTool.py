@@ -1240,7 +1240,7 @@ def get_asn_subnets(asn):
                'Connection'    : 'close'}
     req = requests.get('https://ipinfo.io/'+process_url_encode(asn), headers=headers)
     soup = BeautifulSoup(req.text, 'html.parser')
-    for a in soup.find_all('a', text=True):
+    for a in soup.find_all('a', string=True):
         if asn in str(a):
             return_list.append(str(a.text).strip())
     if return_list:
@@ -1654,7 +1654,7 @@ def get_subsidiaries(company_name, verbose, alt_method, quiet):
                         print('    [*] Parsing subsidiaries')
                     subsid_page = requests.get(subsid_url, headers={'User-Agent': USER_AGENT})
                     soup = BeautifulSoup(subsid_page.text, 'html.parser')
-                    soup_tags = soup.find_all('font', text=True)
+                    soup_tags = soup.find_all('font', string=True)
                     for tag in soup_tags:
                         filter_result = process_potential_company(tag.text, str(sub_list[0]))
                         if filter_result:
