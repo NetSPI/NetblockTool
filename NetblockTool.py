@@ -37,14 +37,13 @@ from lxml import html
 from bs4 import BeautifulSoup
 
 
-# Configure requests to only support high-level ciphers
+# Configure requests
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
-requests.packages.urllib3.util.ssl_.DEFAULT_CIPHERS += 'HIGH:!DH:!aNULL'
 
 
 # Program details
 __authors__ = ['Alex Poorman', 'NetSPI']
-__version__ = '2.0.0'
+__version__ = '2.1.0'
 
 # Global variables
 STATES = ['afghanistan', 'ak', 'al', 'alabama', 'alaska', 'albania', 'alberta',
