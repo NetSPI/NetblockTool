@@ -32,18 +32,18 @@ import edgar
 import requests
 import time
 import random
-from requests.packages.urllib3.exceptions import InsecureRequestWarning
+from urllib3 import disable_warnings, exceptions
 from lxml import html
 from bs4 import BeautifulSoup
 
 
 # Configure requests
-requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
+disable_warnings(exceptions.InsecureRequestWarning)
 
 
 # Program details
 __authors__ = ['Alex Poorman', 'NetSPI']
-__version__ = '2.1.0'
+__version__ = '2.2.0'
 
 # Global variables
 STATES = ['afghanistan', 'ak', 'al', 'alabama', 'alaska', 'albania', 'alberta',
@@ -572,7 +572,7 @@ def process_url_encode(encode_string):
 def process_output_name(encode_string):
     """Removes all bad characters in a string so it can be used as a file name.
     """
-    return_string = re.sub('[^\w\-_\. ]', '_', encode_string)
+    return_string = re.sub('[^\w\-_\.\/ ]', '_', encode_string)
     return_string = return_string.replace(' ', '_')
     return return_string
 
