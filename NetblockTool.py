@@ -572,7 +572,7 @@ def process_url_encode(encode_string):
 def process_output_name(encode_string):
     """Removes all bad characters in a string so it can be used as a file name.
     """
-    return_string = re.sub('[^\w\-_\.\/ ]', '_', encode_string)
+    return_string = re.sub(r'[^\w\-_\.\/ ]', '_', encode_string)
     return_string = return_string.replace(' ', '_')
     return return_string
 
@@ -851,7 +851,7 @@ def process_potential_company(test_string, company_name):
                             if len(temp) < 100:
                                 if len(temp) > 5:
                                     ## Check if only special characters
-                                    if re.match('^[\W_]+$', temp.lower()):
+                                    if re.match(r'^[\W_]+$', temp.lower()):
                                         return None
                                     ## Remove data within parentheses, if applicable
                                     if ('(') and (')') in temp.lower():
@@ -889,7 +889,7 @@ def process_company_extension(company_list):
                 company = company.lower().replace(ext, '')
                 company = company.replace(' ', ' ')
                 company = company.rstrip()
-                if re.match('^[\W_]+$', company[-1]):
+                if re.match(r'^[\W_]+$', company[-1]):
                     company = company[:-1]
                 company = company.title().rstrip()
         process_list.append(company.rstrip())
@@ -1919,12 +1919,12 @@ def get_statistics(netblock_list, subsid_mode):
 def get_usage():
     """Returns the usage and help information for this tool.
     """
-    return'''
+    return '''
   _   _      _   _     _            _    _____           _
- | \ | | ___| |_| |__ | | ___   ___| | _|_   _|__   ___ | |
- |  \| |/ _ \ __| '_ \| |/ _ \ / __| |/ / | |/ _ \ / _ \| |
- | |\  |  __/ |_| |_) | | (_) | (__|   <  | | (_) | (_) | |
- |_| \_|\___|\__|_.__/|_|\___/ \___|_|\_\ |_|\___/ \___/|_|
+ | \\ | | ___| |_| |__ | | ___   ___| | _|_   _|__   ___ | |
+ |  \\| |/ _ \\ __| '_ \\| |/ _ \\ / __| |/ / | |/ _ \\ / _ \\| |
+ | |\\  |  __/ |_| |_) | | (_) | (__|   <  | | (_) | (_) | |
+ |_| \\_|\\___|\\__|_.__/|_|\\___/ \\___|_|\\_\\ |_|\\___/ \\___/|_|
 
 %s [options] {target company}
     Find netblocks owned by a company
@@ -2089,10 +2089,10 @@ if __name__ == '__main__':
     # Print banner
     if not arg_quiet:
         print("""  _   _      _   _     _            _    _____           _
- | \ | | ___| |_| |__ | | ___   ___| | _|_   _|__   ___ | |
- |  \| |/ _ \ __| '_ \| |/ _ \ / __| |/ / | |/ _ \ / _ \| |
- | |\  |  __/ |_| |_) | | (_) | (__|   <  | | (_) | (_) | |
- |_| \_|\___|\__|_.__/|_|\___/ \___|_|\_\ |_|\___/ \___/|_|
+ | \\ | | ___| |_| |__ | | ___   ___| | _|_   _|__   ___ | |
+ |  \\| |/ _ \\ __| '_ \\| |/ _ \\ / __| |/ / | |/ _ \\ / _ \\| |
+ | |\\  |  __/ |_| |_) | | (_) | (__|   <  | | (_) | (_) | |
+ |_| \\_|\\___|\\__|_.__/|_|\\___/ \\___|_|\\_\\ |_|\\___/ \\___/|_|
  """)
 
     # Actions to take depending on whether an input list and/or subsidiary processing was specified
