@@ -1,0 +1,93 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "netblocktool"
+version = "3.7.1"
+description = "Passively discover public netblocks owned by a company and its subsidiaries"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+authors = [
+    { name = "Alex Poorman" },
+    { name = "NetSPI" },
+]
+keywords = ["osint", "reconnaissance", "netblock", "arin", "rdap", "asn", "sec-edgar"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console",
+    "Intended Audience :: Information Technology",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Security",
+]
+dependencies = [
+    "requests>=2.31,<3",
+    "beautifulsoup4>=4.12,<5",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.5",
+    "mypy>=1.10",
+]
+
+[project.scripts]
+netblocktool = "netblocktool.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/NetSPI/NetblockTool"
+Issues = "https://github.com/NetSPI/NetblockTool/issues"
+
+[tool.setuptools.packages.find]
+include = ["netblocktool*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+exclude = [".git", "__pycache__", "build", "dist", ".venv"]
+
+[tool.ruff.lint]
+select = [
+    "E",      # pycodestyle errors
+    "F",      # pyflakes
+    "W",      # pycodestyle warnings
+    "I",      # isort
+    "UP",     # pyupgrade
+    "B",      # flake8-bugbear
+    "SIM",    # flake8-simplify
+    "RUF",    # ruff-specific
+    "EXE",    # executable/shebang consistency
+    "ISC",    # implicit string concatenation
+]
+ignore = [
+    "E501",    # long lines are handled by line-length, not worth churn
+    "B008",    # function calls in defaults (dataclass field factories)
+    "SIM108",  # ternary rewrites hurt readability here
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Test modules import fixtures as a flat package and use bare asserts.
+"tests/*" = ["E402"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["netblocktool"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = [".", "tests"]
+addopts = "-q"
+filterwarnings = ["error::DeprecationWarning"]
+
+[tool.mypy]
+# Typing is partial; mypy is advisory rather than mandatory for now.
+python_version = "3.10"
+ignore_missing_imports = true
+warn_unused_ignores = false
+check_untyped_defs = false

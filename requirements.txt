@@ -1,6 +1,13 @@
-netaddr
-bs4
-lxml
-requests
-fuzzywuzzy
-tqdm
+# NetblockTool runtime dependencies.
+#
+# Deliberately minimal. Everything else the tool needs (CIDR maths, CSV/JSON,
+# argument parsing, concurrency) comes from the standard library.
+#
+# Removed in 3.0 and why:
+#   netaddr     -> replaced by the stdlib `ipaddress` module
+#   lxml        -> no longer needed; all HTML parsing uses bs4's html.parser
+#   fuzzywuzzy  -> abandoned upstream; was only used by dead code
+#   tqdm        -> was only used by that same dead code
+
+requests>=2.31,<3
+beautifulsoup4>=4.12,<5

@@ -1,3 +1,29 @@
-*__pycache__*
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+
+# Packaging / distribution
+build/
+dist/
+*.egg-info/
+
+# Environments
+.venv/
+venv/
+env/
+
+# Editors
 .idea/
+.vscode/
+
+# macOS
+.DS_Store
+
+# Tool output (results are generated, not source)
 *.csv
+*.json
+!tests/**/*.json
+*_subsidiaries.txt

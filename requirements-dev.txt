@@ -1,0 +1,8 @@
+# Development and CI dependencies.
+-r requirements.txt
+
+pytest>=8.0
+ruff>=0.5
+# mypy is advisory: the codebase is partially typed, so type checking is not
+# a required gate.
+mypy>=1.10
