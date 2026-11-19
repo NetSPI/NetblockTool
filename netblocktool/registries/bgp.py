@@ -73,7 +73,8 @@ class BgpClient:
             return self._cache[normalized]
 
         try:
-            payload = self.client.get_json(RIPESTAT_URL, params={"resource": normalized})
+            payload = self.client.get_json(RIPESTAT_URL, params={"resource": normalized},
+                                           no_retry_status=frozenset({500}))
         except HttpError as exc:
             log.warning("BGP prefix lookup failed for %s: %s", normalized, exc)
             self._cache[normalized] = []
@@ -108,7 +109,8 @@ class BgpClient:
             return self._origin_cache[cidr]
         try:
             payload = self.client.get_json(RIPESTAT_PREFIX_OVERVIEW_URL,
-                                           params={"resource": cidr})
+                                           params={"resource": cidr},
+                                           no_retry_status=frozenset({500}))
         except HttpError as exc:
             log.debug("Origin ASN lookup failed for %s: %s", cidr, exc)
             self._origin_cache[cidr] = []

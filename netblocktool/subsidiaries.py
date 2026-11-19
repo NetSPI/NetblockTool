@@ -216,8 +216,11 @@ def discover_subsidiaries(client: EdgarClient, company_name: str,
     companies = client.find_companies(company_name, limit=max_companies)
     if not companies:
         log.warning(
-            "No SEC registrant matched %r. The company may be private, foreign, "
-            "a subsidiary of a holding company, or filed on paper.", company_name,
+            "No SEC registrant matched %r. If the company files under a different "
+            "legal name (e.g. 'Google' files as 'Alphabet Inc', 'Instagram' as "
+            "'Meta Platforms'), retry with -sn \"<legal name>\". The company may "
+            "also be private, foreign, a subsidiary of a holding company, or "
+            "filed on paper.", company_name,
         )
         return []
 

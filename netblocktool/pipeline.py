@@ -130,6 +130,8 @@ class Pipeline:
         company = options.effective_company()
         self._current_company = company
 
+        log.info("Starting search for %r", company)
+
         subsidiaries: list[Subsidiary] = []
         if options.with_subsidiaries:
             subsidiary_target = options.subsidiary_name or options.target
@@ -229,6 +231,7 @@ class Pipeline:
                       for n in self._registry_cache[cache_key]]
             return cached, [], []
 
+        log.info("Querying registries for %r", query)
         registry_result = query_registries(
             query,
             self.registry_clients,

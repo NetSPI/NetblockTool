@@ -25,7 +25,7 @@ from . import __version__
 #: Default identification string. The SEC requires a descriptive User-Agent
 #: containing real contact details; users should override this via ``-u`` or
 #: ``NETBLOCKTOOL_USER_AGENT`` before querying EDGAR.
-DEFAULT_USER_AGENT = f"NetblockTool/{__version__} (passive recon; set NETBLOCKTOOL_USER_AGENT)"
+DEFAULT_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:160.0) Gecko/20100101 Firefox/160.0"
 
 #: SEC explicitly documents a 10 requests/second ceiling. We stay well under it.
 SEC_RATE_LIMIT = 5.0

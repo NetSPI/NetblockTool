@@ -40,13 +40,12 @@ BANNER = r"""  _   _      _   _     _            _    _____           _
 
 EPILOG = """\
 examples:
-  NetblockTool.py Google
-  NetblockTool.py -v Google
-  NetblockTool.py -v -s Google
-  NetblockTool.py -v -p Google
-  NetblockTool.py -wpgav Facebook -so -o Results
-  NetblockTool.py -gavl companies.txt
-  NetblockTool.py -v -4 --json -o Results Google
+  python3 NetblockTool.py Google
+  python3 NetblockTool.py -s Google
+  python3 NetblockTool.py -p Google
+  python3 NetblockTool.py -wpgav Facebook -so -o Results
+  python3 NetblockTool.py -gavl companies.txt
+  python3 NetblockTool.py -4 --json -o Results Google
 
 All data gathering is passive. This tool never sends traffic to the target's
 hosts; it only reads public registry, filing and search data.

@@ -52,13 +52,14 @@ Reference: <https://www.arin.net/resources/registry/whois/rws/api/>
 pip3 install -r requirements.txt
 
 # Run against NetSPI (the tool author's own org — a known-good target)
-python3 NetblockTool.py -v -4 -ng netspi
+python3 NetblockTool.py -4 -ng netspi
 
 # Expected: 7 IPv4 netblocks, confidence confirmed/probable
 ```
 
-Verbose output shows each registry step. You should see ARIN org and network
-lookups completing rather than silently returning nothing.
+Progress output shows each registry step at INFO level. You should see ARIN org
+and network lookups completing rather than silently returning nothing. Add `-v`
+for full debug output.
 
 ---
 
