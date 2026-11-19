@@ -12,7 +12,7 @@ license = { file = "LICENSE" }
 authors = [
     { name = "Alex Poorman" },
     { name = "NetSPI" },
-    { name = "Anmol K Sachan", email = "anmol221999@gmail.com" },
+    { name = "Anmol K Sachan" },
 ]
 keywords = ["osint", "reconnaissance", "netblock", "arin", "rdap", "asn", "sec-edgar"]
 classifiers = [
