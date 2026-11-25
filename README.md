@@ -1,9 +1,10 @@
 # NetblockTool
-Find netblocks owned by a company
 
-[![licence badge]][licence] 
-[![stars badge]][stars] 
-[![forks badge]][forks] 
+Find public netblocks owned by a company and its subsidiaries.
+
+[![licence badge]][licence]
+[![stars badge]][stars]
+[![forks badge]][forks]
 [![issues badge]][issues]
 
 [licence badge]:https://img.shields.io/badge/license-New%20BSD-blue.svg
@@ -16,121 +17,148 @@ Find netblocks owned by a company
 [forks]:https://github.com/NetSPI/NetblockTool/network
 [issues]:https://github.com/NetSPI/NetblockTool/issues
 
-
 ## Overview
-* Use NetblockTool to easily dump a unique list of IP addresses belonging to a company and its subsidiaries.
-* All data gathering is passive. No traffic is ever sent to the target company.
-* Sources include ARIN API, ARIN GUI search functionality, and Google dorking. Company subsidiaries are retrieved from SEC's public database.
 
+NetblockTool passively discovers IP ranges owned by a company by querying public registry, BGP, and filing data - no traffic is ever sent to the target's hosts.
 
-## Quick Run
-```
+**Data sources:**
+- **ARIN** - Whois-RWS REST API (`/rest/orgs`, `/rest/org/{handle}/nets`, `/rest/org/{handle}/asns`)
+- **RDAP** - RIPE NCC, APNIC, AFRINIC, LACNIC
+- **BGPView** - ASN -> announced prefixes; prefix -> origin AS discovery
+- **SEC EDGAR** - Exhibit 21 subsidiary filings (optional, `-s`)
+- **Google dorking** - passive search enrichment (optional, skipped automatically if blocked)
+
+Each result is given a transparent confidence score (`confirmed / probable / weak / unlikely`) with a full evidence trail written to the CSV.
+
+---
+
+## Install
+
+```bash
 git clone https://github.com/NetSPI/NetblockTool.git
-cd NetblockTool && pip3 install -r requirements.txt
-python3 NetblockTool.py -v Company
+cd NetblockTool
+pip3 install -r requirements.txt
 ```
 
+Requires Python 3.10+.
+
+---
+
+## Quick Start
+
+```bash
+# Basic run - registry + search enrichment
+python3 NetblockTool.py Google
+
+# IPv4 only, skip search engine
+python3 NetblockTool.py -4 -ng netspi
+
+# Include subsidiary companies (via SEC EDGAR)
+python3 NetblockTool.py -s Google
+
+# Google files as "Alphabet Inc" - use -sn to match the legal name
+python3 NetblockTool.py -s -sn "Alphabet Inc" Google
+
+# Full enrichment - subsidiaries, PoCs, geolocation, addresses, JSON output
+python3 NetblockTool.py -wpgav Facebook -so -o Results --json
+
+# List mode - one company per line
+python3 NetblockTool.py -gavl companies.txt
+```
+
+Add `-v` for debug output. Without it, INFO-level progress messages are still printed so the tool never appears to hang on large queries.
+
+---
 
 ## Output
-Results are written to a CSV called *Company.csv* where *Company* is the provided company's name. The truncated output for Google is shown below.
 
-![NetblockOutput](https://i.imgur.com/XpFNiO0.png) 
+Results are written to `{Company}.csv` by default. Use `-o Name` to set a custom filename (no extension).
 
+**CSV columns:** Company, Subsidiary, Network, IP Version, Registry, ASN, ASN Holder, Organization, Name, Handle, Type, Confidence, Confidence Score, Subsumed, Evidence, Source URL, Address, Country, City, State, Geolocation, PoC, Discovered At
 
-## How does this script work?
-In depth information on the tool and how it works can be found [here](https://blog.netspi.com/netblocktool/).
-* A target company is provided
-* Google dorking is used to find netblocks
-* Traffic is sent that simulates a user searching ARIN's database for the company name
-* All ARIN links are found, visited, and processed from the previous database query
-* Duplicate networks are removed
-* Each netblock is given a confidence score
-* Netblocks are sorted by confidence score and written to a CSV
+The **Evidence** column contains the scoring audit trail - a semicolon-separated list of `CODE(±points): detail` entries explaining exactly why a netblock scored what it did.
 
+**Confidence bands:**
 
-## Common Use Cases
-Simple run. Get results from Google dorking and ARIN database:
+| Band | Score | Meaning |
+|---|---|---|
+| `confirmed` | ≥ 80 | Authoritative registry record names the company |
+| `probable` | ≥ 55 | Strong but indirect evidence |
+| `weak` | ≥ 25 | Plausible association |
+| `unlikely` | < 25 | Reported for completeness |
 
-`python3 NetblockTool.py Company`
+**JSON output:** Add `--json` to write `{Company}.json` alongside the CSV, or `--json-only` to skip the CSV entirely.
 
-Include the verbose flag to print status updates:
+---
 
-`python3 NetblockTool.py -v Company`
+## All Options
 
-Extract netblocks owned by your target company’s subsidiaries:
-
-`python3 NetblockTool.py -v Company -s`
-
-Extract point of contact information:
-
-`python3 NetblockTool.py -v Company -p`
-
-Get as much information as possible, including netblocks found using wildcard queries, points of contact, geolocation data, and physical addresses:
-
-`python3 NetblockTool.py -wpgav Company -so`
-
-
-## Help
 ```
-$ ./NetblockTool.py
-usage:
-  _   _      _   _     _            _    _____           _
- | \ | | ___| |_| |__ | | ___   ___| | _|_   _|__   ___ | |
- |  \| |/ _ \ __| '_ \| |/ _ \ / __| |/ / | |/ _ \ / _ \| |
- | |\  |  __/ |_| |_) | | (_) | (__|   <  | | (_) | (_) | |
- |_| \_|\___|\__|_.__/|_|\___/ \___|_|\_\ |_|\___/ \___/|_|
+Data retrieval & processing:
+  -n, --no-wildcard       Exact query (query = target)
+  -w, --wildcard          Full wildcard query (query = *target*); more false positives
+  -ng, --no-google        Skip search-engine discovery
+  -c COMPANY              Company name if different from the target argument
+  -e SCORE                Only return results with confidence score >= SCORE
+  -p, --poc-out           Retrieve point-of-contact information
+  -4, --ipv4              Only return IPv4 netblocks
+  -6, --ipv6              Only return IPv6 netblocks
+  --no-subsumed           Omit networks contained inside a larger reported network
+  --no-asn-expansion      Do not expand ASNs into announced prefixes
+  --registries LIST       Comma-separated registries (default: arin,ripe,apnic,afrinic,lacnic)
 
-./NetblockTool.py [options] {target company}
-    Find netblocks owned by a company
+Company subsidiaries:
+  -s, --subsidiary        Discover subsidiaries via SEC EDGAR
+  -sn NAME                Legal name to use for EDGAR subsidiary search
+  -so, --subsidiary-out   Write subsidiary names to {Company}_subsidiaries.txt
+  -u, --user-agent TEXT   Identification string for SEC EDGAR
+                          (required by SEC policy; see https://www.sec.gov/os/accessing-edgar-data)
 
-Positional arguments:
-    {target} Target company (exclude "Inc", "Corp", etc.)
+Physical location:
+  -g, --geolocation       Retrieve geolocation data
+  -a, --address-out       Include registered address in output
+  -ag TEXT                Only return netblocks whose address contains TEXT
 
-Optional arguments:
-    Common Options:
-    -l        List mode; argument is a file with list of companies, one per line
-    -o        File name to write data to (no extension, default is target name)
-    -v        Verbose mode
-    -q        Quiet mode
-    -h        Print this help message
+Output format:
+  -o NAME                 Output filename (no extension)
+  --output-dir DIR        Directory to write output files
+  --json                  Write JSON output alongside CSV
+  --json-only             Write JSON only, no CSV
+  --legacy-csv            Use NetblockTool 2.x CSV column layout
 
-    Data Retrieval & Processing:
-    -n        Don't perform thorough wildcard queries (query = target)
-    -ng       Don't perform Google Dorking queries
-    -w        Perform more thorough complete wildcard queries (query = *target*). Note
-                  that this option may return significantly more false positives.
-    -c        Company name if different than target (may affect accuracy of confidence
-                  scores, use carefully; exclude "Inc", "Corp", etc.)
-    -e        Only return results greater than a given confidence score
-    -p        Retrieve and write point of contact information to a text file. Note that
-                  retrieval of PoC information will likely take some time.
-    -4        Only return IPv4 netblocks
-    -6        Only return IPv6 netblocks
-
-    Company Subsidiaries:
-    -s        Fetch subsidiary information and return netblocks of all subsidiaries in
-                  addition to initial target
-    -sn       Company name to use when fetching subsidiaries
-    -sp       Use alternate parsing method when fetching subsidiary information; use
-                  if the default method isn't working as expected
-    -so       Write subsidiary information to a text file (CompanyName_subsidiaries.txt)
-
-    Physical Location:
-    -g        Retrieve geolocation data (if available)
-    -a        Write netblock address information to output
-    -ag       Write netblock address information to output but only if it contains a
-                  given string
-
-Examples:
-    python NetblockTool.py -v Google
-    python NetblockTool.py -so -wv Facebook -o Results
-    python NetblockTool.py -gavl companies.txt
+Network behaviour:
+  --timeout SECONDS       Per-request timeout (default: 15)
+  --workers N             Max concurrent lookups (default: 8)
+  --retries N             Retry attempts per request (default: 3)
+  --rate-limit RPS        Requests per second per host (default: 8)
 ```
 
+---
 
-### This script isn't working
-Ensure the following:
-* Are all of the dependencies listed in `requirements.txt` installed?
-* Is the `edgar` folder in this repository in the same folder as the NetblockTool.py script?
-* Is the script printing out `Google CAPTCHA detected`? You may need to change your public IP or wait ~60 minutes to retrieve Google dorking results. 
-* You may need to use Python 3.7+
+## Environment Variables
+
+| Variable | Default | Description |
+|---|---|---|
+| `NETBLOCKTOOL_USER_AGENT` | Firefox UA | User-Agent / SEC identification string |
+| `NETBLOCKTOOL_TIMEOUT` | `15.0` | Per-request timeout in seconds |
+| `NETBLOCKTOOL_MAX_WORKERS` | `8` | Maximum concurrent lookups |
+| `NETBLOCKTOOL_MAX_RETRIES` | `3` | Retry attempts per request |
+| `NETBLOCKTOOL_RATE_LIMIT` | `8.0` | Requests per second per host |
+| `NETBLOCKTOOL_CACHE_DIR` | (disabled) | Directory for on-disk HTTP response cache |
+
+Command-line flags always take precedence over environment variables.
+
+---
+
+## Notes
+
+- **SEC EDGAR subsidiary discovery** requires a descriptive User-Agent with real contact details per [SEC policy](https://www.sec.gov/os/accessing-edgar-data). Set `-u "Company Name admin@example.com"` or `NETBLOCKTOOL_USER_AGENT` before using `-s`.
+- Companies that file under a different legal name (e.g. Google -> Alphabet Inc, Instagram -> Meta Platforms) must use `-sn "<legal name>"` for subsidiary discovery to work.
+- **Google dorking** is best-effort. The tool continues with authoritative registry data if it is blocked.
+- **`subsumed` flag** marks a netblock that is fully contained inside another reported network. It does not mean the company doesn't own it - it is a structural note only.
+
+---
+
+## Background
+
+More detail on how the tool works: https://blog.netspi.com/netblocktool/
