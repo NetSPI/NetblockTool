@@ -27,3 +27,4 @@ env/
 *.json
 !tests/**/*.json
 *_subsidiaries.txt
+CLAUDE.md

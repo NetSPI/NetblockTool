@@ -159,17 +159,6 @@ Command-line flags always take precedence over environment variables.
 
 ---
 
-## Running Tests
-
-```bash
-pip3 install pytest
-pytest -q
-```
-
-All 523 tests run fully offline. No network access is required.
-
----
-
 ## Background
 
 More detail on how the tool works: https://blog.netspi.com/netblocktool/
