@@ -1,84 +1,175 @@
-# NetblockTool — modernize-from-upstream
+# NetblockTool
 
-This branch brings NetblockTool up to date with the v3.7.1 upstream release,
-which addresses both issues raised in the review.
+Find public netblocks owned by a company and its subsidiaries.
+
+[![licence badge]][licence]
+[![stars badge]][stars]
+[![forks badge]][forks]
+[![issues badge]][issues]
+
+[licence badge]:https://img.shields.io/badge/license-New%20BSD-blue.svg
+[stars badge]:https://img.shields.io/github/stars/NetSPI/NetblockTool.svg
+[forks badge]:https://img.shields.io/github/forks/NetSPI/NetblockTool.svg
+[issues badge]:https://img.shields.io/github/issues/NetSPI/NetblockTool.svg
+
+[licence]:https://github.com/NetSPI/NetblockTool/blob/master/LICENSE
+[stars]:https://github.com/NetSPI/NetblockTool/stargazers
+[forks]:https://github.com/NetSPI/NetblockTool/network
+[issues]:https://github.com/NetSPI/NetblockTool/issues
+
+## Overview
+
+NetblockTool passively discovers IP ranges owned by a company by querying public registry, BGP, and filing data - no traffic is ever sent to the target's hosts.
+
+**Data sources:**
+- **ARIN** - Whois-RWS REST API (`/rest/orgs`, `/rest/org/{handle}/nets`, `/rest/org/{handle}/asns`)
+- **RDAP** - RIPE NCC, APNIC, AFRINIC, LACNIC
+- **BGPView** - ASN -> announced prefixes; prefix -> origin AS discovery
+- **SEC EDGAR** - Exhibit 21 subsidiary filings (optional, `-s`)
+- **Google dorking** - passive search enrichment (optional, skipped automatically if blocked)
+
+Each result is given a transparent confidence score (`confirmed / probable / weak / unlikely`) with a full evidence trail written to the CSV.
 
 ---
 
-## What was fixed
-
-### 1. SyntaxWarning: invalid escape sequence
-
-The older codebase used unescaped backslashes in regex strings — for example
-`re.compile("\d+")` instead of `re.compile(r"\d+")`. Python 3.12+ promotes
-these to `SyntaxWarning` and they will become `SyntaxError` in a future
-release.
-
-Every regex string in the updated codebase uses raw string literals (`r"..."`).
-You can confirm no warnings are produced:
+## Install
 
 ```bash
-python3 -W error NetblockTool.py --help
+git clone https://github.com/NetSPI/NetblockTool.git
+cd NetblockTool
+pip3 install -r requirements.txt
 ```
 
-No output on stderr means zero warnings.
-
-### 2. ARIN returns no data
-
-The previous version POSTed queries to `https://whois.arin.net/ui/query.do`
-and regex-scraped resource URLs from the returned HTML. That web UI was retired;
-the endpoint no longer returns usable results, which is why ARIN queries came
-back empty.
-
-The updated ARIN client (`netblocktool/registries/arin.py`) uses the
-documented Whois-RWS REST API instead:
-
-| Endpoint | Purpose |
-|---|---|
-| `/rest/orgs;name=<q>` | Organisation name search |
-| `/rest/org/{handle}/nets` | Networks registered to an org |
-| `/rest/org/{handle}/asns` | ASNs registered to an org |
-| `/rest/customers;name=<q>` | Customer/reassignment records |
-| `/rest/nets;name=<q>` | Network name search |
-
-Reference: <https://www.arin.net/resources/registry/whois/rws/api/>
+Requires Python 3.10+.
 
 ---
 
-## Quick verification
+## Quick Start
 
 ```bash
-# Install dependencies
-pip3 install -r requirements.txt
+# Basic run - registry + search enrichment
+python3 NetblockTool.py Google
 
-# Run against NetSPI (the tool author's own org — a known-good target)
+# IPv4 only, skip search engine
 python3 NetblockTool.py -4 -ng netspi
 
-# Expected: 7 IPv4 netblocks, confidence confirmed/probable
+# Include subsidiary companies (via SEC EDGAR)
+python3 NetblockTool.py -s Google
+
+# Google files as "Alphabet Inc" - use -sn to match the legal name
+python3 NetblockTool.py -s -sn "Alphabet Inc" Google
+
+# Full enrichment - subsidiaries, PoCs, geolocation, addresses, JSON output
+python3 NetblockTool.py -wpgav Facebook -so -o Results --json
+
+# List mode - one company per line
+python3 NetblockTool.py -gavl companies.txt
 ```
 
-Progress output shows each registry step at INFO level. You should see ARIN org
-and network lookups completing rather than silently returning nothing. Add `-v`
-for full debug output.
+Add `-v` for debug output. Without it, INFO-level progress messages are still printed so the tool never appears to hang on large queries.
 
 ---
 
-## Running the test suite
+## Output
+
+Results are written to `{Company}.csv` by default. Use `-o Name` to set a custom filename (no extension).
+
+**CSV columns:** Company, Subsidiary, Network, IP Version, Registry, ASN, ASN Holder, Organization, Name, Handle, Type, Confidence, Confidence Score, Subsumed, Evidence, Source URL, Address, Country, City, State, Geolocation, PoC, Discovered At
+
+The **Evidence** column contains the scoring audit trail - a semicolon-separated list of `CODE(±points): detail` entries explaining exactly why a netblock scored what it did.
+
+**Confidence bands:**
+
+| Band | Score | Meaning |
+|---|---|---|
+| `confirmed` | ≥ 80 | Authoritative registry record names the company |
+| `probable` | ≥ 55 | Strong but indirect evidence |
+| `weak` | ≥ 25 | Plausible association |
+| `unlikely` | < 25 | Reported for completeness |
+
+**JSON output:** Add `--json` to write `{Company}.json` alongside the CSV, or `--json-only` to skip the CSV entirely.
+
+---
+
+## All Options
+
+```
+Data retrieval & processing:
+  -n, --no-wildcard       Exact query (query = target)
+  -w, --wildcard          Full wildcard query (query = *target*); more false positives
+  -ng, --no-google        Skip search-engine discovery
+  -c COMPANY              Company name if different from the target argument
+  -e SCORE                Only return results with confidence score >= SCORE
+  -p, --poc-out           Retrieve point-of-contact information
+  -4, --ipv4              Only return IPv4 netblocks
+  -6, --ipv6              Only return IPv6 netblocks
+  --no-subsumed           Omit networks contained inside a larger reported network
+  --no-asn-expansion      Do not expand ASNs into announced prefixes
+  --registries LIST       Comma-separated registries (default: arin,ripe,apnic,afrinic,lacnic)
+
+Company subsidiaries:
+  -s, --subsidiary        Discover subsidiaries via SEC EDGAR
+  -sn NAME                Legal name to use for EDGAR subsidiary search
+  -so, --subsidiary-out   Write subsidiary names to {Company}_subsidiaries.txt
+  -u, --user-agent TEXT   Identification string for SEC EDGAR
+                          (required by SEC policy; see https://www.sec.gov/os/accessing-edgar-data)
+
+Physical location:
+  -g, --geolocation       Retrieve geolocation data
+  -a, --address-out       Include registered address in output
+  -ag TEXT                Only return netblocks whose address contains TEXT
+
+Output format:
+  -o NAME                 Output filename (no extension)
+  --output-dir DIR        Directory to write output files
+  --json                  Write JSON output alongside CSV
+  --json-only             Write JSON only, no CSV
+  --legacy-csv            Use NetblockTool 2.x CSV column layout
+
+Network behaviour:
+  --timeout SECONDS       Per-request timeout (default: 15)
+  --workers N             Max concurrent lookups (default: 8)
+  --retries N             Retry attempts per request (default: 3)
+  --rate-limit RPS        Requests per second per host (default: 8)
+```
+
+---
+
+## Environment Variables
+
+| Variable | Default | Description |
+|---|---|---|
+| `NETBLOCKTOOL_USER_AGENT` | Firefox UA | User-Agent / SEC identification string |
+| `NETBLOCKTOOL_TIMEOUT` | `15.0` | Per-request timeout in seconds |
+| `NETBLOCKTOOL_MAX_WORKERS` | `8` | Maximum concurrent lookups |
+| `NETBLOCKTOOL_MAX_RETRIES` | `3` | Retry attempts per request |
+| `NETBLOCKTOOL_RATE_LIMIT` | `8.0` | Requests per second per host |
+| `NETBLOCKTOOL_CACHE_DIR` | (disabled) | Directory for on-disk HTTP response cache |
+
+Command-line flags always take precedence over environment variables.
+
+---
+
+## Notes
+
+- **SEC EDGAR subsidiary discovery** requires a descriptive User-Agent with real contact details per [SEC policy](https://www.sec.gov/os/accessing-edgar-data). Set `-u "Company Name admin@example.com"` or `NETBLOCKTOOL_USER_AGENT` before using `-s`.
+- Companies that file under a different legal name (e.g. Google -> Alphabet Inc, Instagram -> Meta Platforms) must use `-sn "<legal name>"` for subsidiary discovery to work.
+- **Google dorking** is best-effort. The tool continues with authoritative registry data if it is blocked.
+- **`subsumed` flag** marks a netblock that is fully contained inside another reported network. It does not mean the company doesn't own it - it is a structural note only.
+
+---
+
+## Running Tests
 
 ```bash
 pip3 install pytest
 pytest -q
 ```
 
-All 523 unit tests run fully offline (no network access required). The test
-suite also covers the ARIN client via a fixture-driven mock of the REST API.
+All 523 tests run fully offline. No network access is required.
 
 ---
 
-## Dependencies
+## Background
 
-Runtime: `requests>=2.31` and `beautifulsoup4>=4.12` only.
-
-The old dependencies (`netaddr`, `lxml`, `fuzzywuzzy`, `tqdm`) were removed
-upstream in 3.0 — the first three were replaced by stdlib equivalents and the
-latter two were only used by dead code.
+More detail on how the tool works: https://blog.netspi.com/netblocktool/
